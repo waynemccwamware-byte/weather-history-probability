@@ -723,7 +723,7 @@
   html.modal-open, html.modal-open body{ overflow:hidden; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<!-- GGP-FOOTER-CSS START v1 · 20-Oct-2026 · shared footer styles, App Conventions §5b · master: Control Panel repo tools/ggp-footer -->
+<!-- GGP-FOOTER-CSS START v1.1 · 20-Oct-2026 · shared footer styles, App Conventions §5b · master: Control Panel repo tools/ggp-footer -->
 <style>
 .ggp-footer{
   --ggp-amber:#f5a623; --ggp-muted:#8b93a1; --ggp-bezel:#2a323f; --ggp-bezel-hi:#3a4454;
@@ -977,7 +977,7 @@
 
   <div class="disclaimer"><span class="disclaimer-label">Disclaimer:</span> <span class="disclaimer-quote">&ldquo;There are three kinds of lies: lies, damned lies, and statistics.&rdquo;</span> &mdash; Mark Twain</div>
 
-  <!-- GGP-FOOTER START v1 · 20-Oct-2026 · shared footer, App Conventions §5a · master: Control Panel repo tools/ggp-footer -->
+  <!-- GGP-FOOTER START v1.1 · 20-Oct-2026 · shared footer, App Conventions §5a · master: Control Panel repo tools/ggp-footer -->
 <footer class="ggp-footer">
   <div class="ggp-back"><a href="https://geezer-geek-pilot-control-panel.netlify.app/">&larr; Back to GeezerGeek Pilot Apps</a></div>
   <div class="ggp-credit">Wayne McClelland, <a href="https://youtube.com/@GeezerGeekPilot" target="_blank" rel="noopener">GeezerGeek Pilot</a>, <a href="https://docs.google.com/document/d/1chfDa3JBCjsGykGjwrAFwOqMAS7d3_dIY9ieROLCIyU/preview" target="_blank" rel="noopener">Reference Materials</a></div>
@@ -2899,7 +2899,7 @@
     .catch(() => { /* fail silently if the counter function is unavailable */ });
 </script>
 
-<!-- GGP-FOOTER-JS START v1 · 20-Oct-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
+<!-- GGP-FOOTER-JS START v1.1 · 20-Oct-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
 <script>
 (() => {
   if (window.__ggpFooter) return;
@@ -2940,7 +2940,8 @@
     fetch('https://tally.yuki.sh/hits/wamware/geezer-geek-pilot-control-panel.json')
       .then(r => r.json())
       .then(d => {
-        const n = d && d.visit;
+        const base = parseInt(countEl.dataset.base, 10) || 0;  // pre-Tally opens, App Conventions §6b
+        const n = d && typeof d.visit === 'number' ? d.visit + base : null;
         if (typeof n === 'number') countEl.textContent = 'Opened ' + n.toLocaleString() + (n === 1 ? ' time' : ' times');
       })
       .catch(() => { /* counter is a nice-to-have, never block the app */ });
