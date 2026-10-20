@@ -1,0 +1,10 @@
+# Weather History and Probability — deployed by Netlify from this GitHub repo (main branch).
+# No build step: Netlify publishes site/ as-is and bundles the dependency-free
+# functions from netlify/functions/.
+[build]
+  publish = "site"
+  functions = "netlify/functions"
+  command = ""
+
+[functions]
+  node_bundler = "esbuild"

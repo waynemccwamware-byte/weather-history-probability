@@ -1,0 +1,2915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Weather History and Probability</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#10141a;
+    --bg-panel:#1b222c;
+    --bezel:#2a323f;
+    --bezel-hi:#3a4454;
+    --amber:#f5a623;
+    --amber-dim:#7a5a1e;
+    --amber-glow:rgba(245,166,35,0.35);
+    --text-primary:#e7e4dc;
+    --text-muted:#8b93a1;
+    --teal:#3fa7a0;
+    --focus:#f5a623;
+    --alert:#e0705f;
+    /* app-specific tokens go below this line, with a comment */
+  }
+  :root{
+    box-sizing:border-box;
+    padding-top:env(safe-area-inset-top, 0px);
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  *,*::before,*::after{ box-sizing:inherit; -webkit-tap-highlight-color:transparent; }
+  html,body{min-height:100%;}
+  html{
+    background:var(--bg-deep);
+    overscroll-behavior:none;
+    scroll-padding-top:env(safe-area-inset-top, 0px);
+    color-scheme:dark;
+  }
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    background:radial-gradient(ellipse at 50% 0%, #171d26 0%, var(--bg-deep) 60%);
+    font-family:'IBM Plex Sans', sans-serif;
+    color:var(--text-primary);
+    padding:40px 24px;
+    -webkit-text-size-adjust:100%;
+    overscroll-behavior:none;
+  }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+
+  .rig{
+    width:100%;
+    max-width:840px;
+    overflow-x:hidden;
+  }
+
+  .title-row{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:2px;
+    padding:0 4px;
+  }
+  .title-row h1{
+    font-size:19px;
+    font-weight:600;
+    margin:0;
+    letter-spacing:0.01em;
+  }
+  .title-row .ver{
+    font-size:11px;
+    color:var(--text-muted);
+  }
+
+  .purpose-line{
+    font-size:12.5px;
+    color:var(--teal);
+    margin:6px 4px 20px;
+    line-height:1.5;
+  }
+  .purpose-label{ color:var(--text-primary); }
+
+  .panel{
+    background:var(--bg-panel);
+    border:1px solid var(--bezel);
+    border-radius:6px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 20px 40px rgba(0,0,0,0.35);
+    overflow:hidden;
+  }
+
+  .step{
+    display:grid;
+    grid-template-columns:minmax(0, 1fr); /* minmax: stop the widest child (date inputs, long hints) pushing the card past the screen on phones */
+    padding:22px;
+    border-bottom:1px solid var(--bezel);
+  }
+  .step:last-of-type{ border-bottom:none; }
+  .step.results-step{ display:none; }
+  .step.results-step.visible{ display:grid; }
+
+  .step-body h2{
+    font-size:13.5px;
+    font-weight:600;
+    margin:0 0 4px;
+    letter-spacing:0.02em;
+  }
+  .step-body p.hint{
+    font-size:12px;
+    color:var(--text-muted);
+    margin:0 0 14px;
+    line-height:1.5;
+  }
+
+  /* Airport search */
+  .airport-search{ position:relative; }
+  .airport-search input[type="text"]{
+    width:100%;
+    padding:10px 34px 10px 13px;
+    font-size:16px;
+    font-family:'IBM Plex Mono', monospace;
+    border:1px solid var(--bezel-hi);
+    border-radius:6px;
+    background:var(--bg-deep);
+    color:var(--text-primary);
+    outline:none;
+    transition:border-color 0.15s, box-shadow 0.15s;
+  }
+  .airport-search input[type="text"]:focus{
+    border-color:var(--amber);
+    box-shadow:0 0 0 3px var(--amber-glow);
+  }
+  .airport-search input::placeholder{ color:#5c6472; font-family:'IBM Plex Sans', sans-serif; }
+  .airport-clear{
+    position:absolute;
+    right:8px;
+    top:50%;
+    transform:translateY(-50%);
+    width:24px;
+    height:24px;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    border:none;
+    border-radius:50%;
+    background:transparent;
+    color:var(--text-muted);
+    cursor:pointer;
+    padding:0;
+  }
+  .airport-clear:hover{ background:var(--bezel); color:var(--text-primary); }
+  .airport-clear.visible{ display:flex; }
+
+  .suggestions{
+    margin-top:8px;
+    border:1px solid var(--bezel);
+    border-radius:6px;
+    overflow:hidden;
+    display:none;
+  }
+  .suggestions.visible{ display:block; }
+  .suggestion-row{
+    padding:10px 13px;
+    font-size:12.5px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    cursor:pointer;
+    border-bottom:1px solid var(--bezel);
+    background:var(--bg-panel);
+  }
+  .suggestion-row:last-child{ border-bottom:none; }
+  .suggestion-row:hover{ background:#232b37; }
+  .suggestion-row .code{ font-family:'IBM Plex Mono', monospace; font-weight:600; color:var(--amber); }
+  .suggestion-row .name{ color:var(--text-muted); }
+  .suggestion-row.no-match{
+    color:var(--text-muted);
+    font-size:12px;
+    line-height:1.5;
+    cursor:default;
+  }
+  .suggestion-row.no-match:hover{ background:var(--bg-panel); }
+
+  .no-history-note{
+    display:none;
+    margin-top:12px;
+    padding:12px 14px;
+    background:#241d14;
+    border:1px solid var(--amber-dim);
+    border-radius:6px;
+    font-size:12.5px;
+    line-height:1.5;
+    color:var(--text-primary);
+  }
+  .no-history-note.visible{ display:block; }
+  .demo-banner{
+    display:none; margin:0 0 14px; padding:9px 12px; border-radius:6px;
+    border:1px dashed var(--amber); color:var(--amber); font-size:13px; line-height:1.4;
+  }
+  .demo-banner.visible{ display:block; }
+  .no-history-note .code{ font-family:'IBM Plex Mono', monospace; font-weight:600; color:var(--amber); }
+
+  .proxy-choice{
+    margin-top:10px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .proxy-chip{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    padding:6px 12px;
+    border:1px solid var(--bezel-hi);
+    border-radius:999px;
+    background:var(--bg-deep);
+    cursor:pointer;
+    color:var(--text-primary);
+  }
+  .proxy-chip:hover{ border-color:var(--amber); }
+  .proxy-chip.selected{
+    background:var(--amber);
+    border-color:var(--amber);
+    color:#1b1400;
+  }
+  .proxy-chip.custom{ color:var(--teal); }
+
+  .custom-station-input{ display:none; margin-top:10px; }
+  .custom-station-input.visible{ display:block; }
+  .custom-station-input input{
+    width:100%;
+    padding:9px 12px;
+    font-size:16px;
+    font-family:'IBM Plex Mono', monospace;
+    border:1px solid var(--bezel-hi);
+    border-radius:6px;
+    background:var(--bg-deep);
+    color:var(--text-primary);
+    outline:none;
+  }
+  .custom-station-input input:focus{
+    border-color:var(--amber);
+    box-shadow:0 0 0 3px var(--amber-glow);
+  }
+
+  /* Radio group */
+  .radio-group{
+    display:flex;
+    flex-direction:column;
+    border:1px solid var(--bezel);
+    border-radius:6px;
+    overflow:hidden;
+  }
+  .radio-option{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+    padding:13px 15px;
+    background:var(--bg-deep);
+    border-bottom:1px solid var(--bezel);
+    cursor:pointer;
+    min-width:0;
+  }
+  /* Flex/grid items default to min-width:auto, which can force a track
+     wider than the viewport once nested flex (this label) sits inside a
+     grid cell -- min-width:0 here and on the text wrapper
+     below lets the description text actually wrap instead of pushing the
+     whole page into horizontal overflow on narrow phone screens. */
+  .radio-option > div{ min-width:0; }
+  .radio-option .label, .radio-option .desc{ overflow-wrap:break-word; }
+  .radio-option:last-child{ border-bottom:none; }
+  .radio-option:hover{ background:#171d26; }
+  .radio-option input[type="radio"]{
+    margin-top:3px;
+    accent-color:var(--amber);
+    width:15px;
+    height:15px;
+    flex-shrink:0;
+  }
+  .radio-option .label{ font-size:13px; font-weight:500; }
+  .radio-option .desc{ font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+  .radio-option.checked{ background:#241d14; }
+  .radio-option.disabled{ cursor:not-allowed; opacity:0.5; }
+  .radio-option.disabled:hover{ background:var(--bg-deep); }
+
+  /* Narrow phones: 2-up grid and side-by-side "Results by" get cramped
+     with this much description text -- stack both back to single column
+     below ~480px. */
+  @media (max-width:480px){
+    #radioGroup.radio-group{ flex-direction:column; }
+    #radioGroup .radio-option{ border-right:none; border-bottom:1px solid var(--bezel); }
+    #radioGroup .radio-option:last-child{ border-bottom:none; }
+  }
+
+  /* "Results by" -- just 2 options, side by side instead of stacked. */
+  #radioGroup.radio-group{ flex-direction:row; }
+  #radioGroup .radio-option{
+    flex:1;
+    border-bottom:none;
+    border-right:1px solid var(--bezel);
+  }
+  #radioGroup .radio-option:last-child{ border-right:none; }
+
+  /* Date range */
+  .date-range{ margin-top:14px; }
+  .date-range-label{ display:block; font-size:10.5px; color:var(--text-muted); margin-bottom:6px; }
+  .date-range-fields{ display:flex; align-items:center; gap:14px; }
+  .date-field{ flex:1; min-width:0; }
+  .date-field label.small{
+    display:block;
+    font-size:10.5px;
+    color:var(--text-muted);
+    margin-bottom:6px;
+  }
+  .date-field input[type="date"]{
+    width:100%;
+    padding:9px 11px;
+    font-size:16px;
+    font-family:'IBM Plex Mono', monospace;
+    border:1px solid var(--bezel-hi);
+    border-radius:6px;
+    background:var(--bg-deep);
+    color:var(--text-primary);
+    outline:none;
+    color-scheme:dark;
+  }
+  .date-field input[type="date"]:focus{
+    border-color:var(--amber);
+    box-shadow:0 0 0 3px var(--amber-glow);
+  }
+  .date-arrow{ color:var(--text-muted); font-size:15px; margin-top:16px; }
+  .date-range-note{ font-size:11px; color:var(--text-muted); margin-top:10px; }
+
+  /* Run button */
+  .run-row{
+    padding:22px;
+    display:flex;
+    align-items:center;
+    gap:16px;
+  }
+  button.run{
+    font-family:'IBM Plex Sans', sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    padding:12px 26px;
+    background:var(--amber);
+    color:#1b1400;
+    border:none;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background 0.15s, box-shadow 0.15s;
+  }
+  button.run:hover{ background:#ffb943; box-shadow:0 0 0 4px var(--amber-glow); }
+  button.run:disabled{
+    background:var(--bezel-hi);
+    color:var(--text-muted);
+    cursor:not-allowed;
+    box-shadow:none;
+  }
+  button.run:disabled:hover{ background:var(--bezel-hi); box-shadow:none; }
+
+  .run-status{ font-size:12px; color:var(--text-muted); }
+
+  .placeholder-result{
+    display:none;
+    margin:0 22px 22px;
+    padding:16px 18px;
+    border:1px dashed var(--bezel);
+    border-radius:8px;
+    background:var(--bg-deep);
+    font-size:12.5px;
+    color:var(--text-muted);
+    line-height:1.6;
+  }
+  .placeholder-result.visible{ display:block; }
+  .placeholder-result .mono{ color:var(--teal); }
+
+  /* CSV upload */
+  .csv-upload{
+    margin-top:12px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .csv-upload button.upload-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:12.5px;
+    font-weight:500;
+    padding:9px 15px;
+    border:1px solid var(--bezel-hi);
+    border-radius:6px;
+    background:var(--bg-deep);
+    color:var(--text-primary);
+    cursor:pointer;
+    transition:border-color 0.15s;
+  }
+  .csv-upload button.upload-btn:hover{ border-color:var(--amber); }
+  .csv-upload button.upload-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  #fetchNoaaBtn.ready{
+    background:var(--amber);
+    color:#1b1400;
+    border-color:var(--amber);
+    font-weight:600;
+  }
+  #fetchNoaaBtn.ready:hover{ background:#ffb943; border-color:#ffb943; }
+  #fetchNoaaBtn.ready svg{ color:#1b1400; }
+  .csv-filename{ font-family:'IBM Plex Mono', monospace; font-size:11.5px; color:var(--teal); }
+  .csv-hint{ font-size:11px; color:var(--text-muted); margin-top:8px; line-height:1.5; }
+
+  .month-picker{ margin-top:14px; display:none; }
+  .month-picker.visible{ display:block; }
+  .month-picker label.small{
+    display:block;
+    font-size:10.5px;
+    color:var(--text-muted);
+    margin-bottom:6px;
+  }
+  .month-picker select{
+    width:100%;
+    max-width:280px;
+    padding:9px 11px;
+    font-size:14px;
+    font-family:'IBM Plex Sans', sans-serif;
+    border:1px solid var(--bezel-hi);
+    border-radius:6px;
+    background:var(--bg-deep);
+    color:var(--text-primary);
+    outline:none;
+    color-scheme:dark;
+  }
+  .month-picker select:focus{
+    border-color:var(--amber);
+    box-shadow:0 0 0 3px var(--amber-glow);
+  }
+  .time-range{ margin-top:14px; }
+  .time-range label.small{
+    display:block;
+    font-size:10.5px;
+    color:var(--text-muted);
+    margin-bottom:6px;
+  }
+  .time-range-fields{ display:flex; align-items:center; gap:8px; max-width:340px; }
+  .time-range-fields select{
+    flex:1; min-width:0;
+    padding:9px 4px 9px 8px;
+    font-size:14px;
+    font-family:'IBM Plex Sans', sans-serif;
+    border:1px solid var(--bezel-hi);
+    border-radius:6px;
+    background:var(--bg-deep);
+    color:var(--text-primary);
+    outline:none;
+    color-scheme:dark;
+  }
+  @media (max-width:380px){ .time-range-fields select{ font-size:13px; } }
+  .time-range-fields select:focus{
+    border-color:var(--amber);
+    box-shadow:0 0 0 3px var(--amber-glow);
+  }
+
+  /* Results */
+  .result-panel{
+    display:none;
+    margin:0 22px 22px;
+  }
+  .result-panel.visible{ display:block; }
+  .result-meta{
+    font-size:11.5px;
+    color:var(--text-muted);
+    margin-bottom:12px;
+    line-height:1.6;
+  }
+  .result-meta .mono{ color:var(--teal); }
+  .chart-frame{
+    background:var(--bg-deep);
+    border:1px solid var(--bezel);
+    border-radius:8px;
+    padding:16px 16px 8px;
+  }
+  /* Explicit height on the wrapper (not the canvas) + Chart.js's
+     maintainAspectRatio:false below means the chart always fills this
+     box exactly, instead of Chart.js computing its own width/height
+     ratio -- that self-computed-ratio approach is what caused the
+     title/axis-label overlap on rotation to landscape, where the
+     available width changes a lot but this fixed height doesn't need to. */
+  .chart-canvas-wrap{ position:relative; width:100%; height:320px; }
+  @media (max-width:480px){ .chart-canvas-wrap{ height:260px; } }
+
+  .contrib-panel{ display:none; margin-top:16px; }
+  .contrib-panel.visible{ display:block; }
+  .contrib-desc{
+    font-size:12px;
+    color:var(--text-muted);
+    line-height:1.6;
+    margin-bottom:10px;
+  }
+  .contrib-legend{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    margin-left:4px;
+  }
+  .contrib-legend-swatch{
+    display:inline-block;
+    width:44px;
+    height:9px;
+    border-radius:3px;
+    background:linear-gradient(90deg, rgba(224,100,92,0.10), rgba(224,100,92,0.90));
+    vertical-align:middle;
+  }
+  .contrib-table-wrap{
+    overflow-x:auto;
+    background:var(--bg-deep);
+    border:1px solid var(--bezel);
+    border-radius:8px;
+    padding:12px 12px 8px;
+  }
+  .contrib-table{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+    font-size:11px;
+  }
+  .contrib-table th{
+    text-align:center;
+    padding:4px 1px 8px;
+    color:var(--text-muted);
+    font-weight:500;
+  }
+  .contrib-table th:first-child{ text-align:left; }
+  .contrib-table td.contrib-label{
+    padding:6px 8px 6px 0;
+    color:var(--text-primary);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .contrib-table td.contrib-cell{
+    height:24px;
+    border-radius:2px;
+  }
+  .contrib-table td.contrib-cell.no-data{
+    background:transparent;
+    border:1px dashed var(--bezel);
+  }
+  @media (max-width:480px){
+    .contrib-table{ font-size:9.5px; }
+    .contrib-table td.contrib-label{ padding-right:4px; }
+    .contrib-desc{ font-size:11px; }
+  }
+
+  .contrib-note{ display:none; font-size:12px; color:var(--text-muted); margin-top:10px; font-style:italic; }
+
+  /* Temperature & dew point (v0.17): separate card below the heat maps */
+  .temp-panel{ display:none; margin-top:22px; padding-top:16px; border-top:1px solid var(--bezel); }
+  .temp-panel.visible{ display:block; }
+  .temp-head{ font-size:13px; font-weight:600; color:var(--text-primary); margin-bottom:4px; }
+  .temp-desc{ font-size:12px; color:var(--text-muted); line-height:1.6; margin-bottom:8px; }
+  .temp-legend{ display:flex; flex-wrap:wrap; gap:6px 14px; font-size:11px; color:var(--text-muted); margin-bottom:10px; }
+  .temp-legend span{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+  .temp-sw{ display:inline-block; width:14px; height:10px; border-radius:2px; }
+  .temp-sw.pair{ width:22px; background:linear-gradient(90deg, var(--a) 0 50%, var(--b) 50% 100%); }
+  .temp-tick{ display:inline-block; width:16px; height:3px; background:#ffffff; box-shadow:0 0 0 1px #10141a; border-radius:1px; }
+  .temp-tick.b{ background:#c3c9d2; }
+  .temp-empty{ display:none; font-size:12px; color:var(--text-muted); font-style:italic; margin-top:6px; }
+  .temp-empty.visible{ display:block; }
+  .temp-panel .chart-canvas-wrap{ height:300px; }
+  @media (max-width:480px){ .temp-panel .chart-canvas-wrap{ height:260px; } .temp-desc{ font-size:11px; } }
+
+  /* Compare two airports (v0.13; second field always shown since v0.14) */
+  .compare-block{ margin-top:14px; }
+  .compare-head{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .compare-head label.small{ font-size:10.5px; color:var(--text-muted); letter-spacing:0.04em; }
+  .compare-shade-note{ letter-spacing:0; text-transform:none; }
+  .contrib-maps{ display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap:14px; }
+  .contrib-maps.stack{ grid-template-columns:minmax(0, 1fr); }
+  .contrib-map{ min-width:0; }
+  .contrib-map-head{ display:none; font-size:12px; font-weight:600; color:var(--text-primary); margin-bottom:6px; }
+  .contrib-maps.compare .contrib-map-head{ display:block; }
+  #contribMapB{ display:none; }
+  .contrib-maps.compare #contribMapB{ display:block; }
+  .contrib-note.visible{ display:block; }
+  .result-error{ white-space:pre-line; }
+  .result-error{
+    display:none;
+    margin:0 22px 22px;
+    padding:14px 16px;
+    border:1px solid var(--amber-dim);
+    border-radius:8px;
+    background:#241d14;
+    font-size:12.5px;
+    color:var(--text-primary);
+    line-height:1.6;
+  }
+  .result-error.visible{ display:block; }
+
+  .sources{
+    margin-top:24px;
+    padding:0 4px;
+    font-size:11px;
+    color:var(--text-muted);
+    line-height:1.6;
+  }
+  .sources .sources-label{ color:var(--text-primary); font-weight:600; }
+  .sources a{ color:var(--teal); text-decoration:none; }
+  .sources a:hover{ text-decoration:underline; }
+
+  .disclaimer{
+    margin-top:14px;
+    padding:0 4px;
+    font-size:13.5px;
+    text-align:center;
+    line-height:1.6;
+  }
+  .disclaimer .disclaimer-label{
+    color:var(--text-primary);
+    font-weight:700;
+  }
+  .disclaimer .disclaimer-quote{
+    color:var(--amber);
+    font-style:italic;
+  }
+
+  footer.page-footer{
+    text-align:center;
+    font-size:11px;
+    color:var(--text-muted);
+    margin-top:20px;
+  }
+  footer.page-footer a{ color:var(--teal); text-decoration:none; }
+  footer.page-footer a:hover{ text-decoration:underline; }
+  .back-link{ margin-bottom:10px; }
+  .back-link a{
+    display:inline-block;
+    background:var(--bezel);
+    color:var(--amber);
+    text-decoration:none;
+    border:1px solid var(--bezel-hi);
+    border-radius:5px;
+    padding:6px 14px;
+    font-size:12px;
+  }
+  .back-link a:hover{ background:var(--bezel-hi); text-decoration:none; }
+  .credit-line{ margin-bottom:2px; }
+  .hit-counter{ margin-top:8px; font-size:11px; color:var(--text-muted); }
+  .share-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    margin-top:14px;
+    background:transparent;
+    border:1px solid var(--bezel-hi);
+    border-radius:20px;
+    padding:8px 16px;
+    color:var(--text-muted);
+    font-family:'IBM Plex Sans', sans-serif;
+    font-size:12.5px;
+    cursor:pointer;
+    transition:color 0.15s ease, border-color 0.15s ease;
+  }
+  .share-btn:hover{ color:var(--amber); border-color:var(--amber); }
+  .share-icon{ width:15px; height:15px; flex-shrink:0; }
+
+  /* Share Analysis Results (v0.16): pill on the chart's top-right corner */
+  .result-share-row{ display:flex; justify-content:flex-end; margin:0 0 -1px; }
+  .result-share-btn{
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--bg-deep); border:1px solid var(--bezel); border-bottom:none;
+    border-radius:8px 8px 0 0; padding:6px 12px;
+    color:var(--teal); font:500 12px 'IBM Plex Sans', sans-serif; cursor:pointer;
+    transition:color .15s ease;
+  }
+  .result-share-btn:hover{ color:var(--amber); }
+  .result-share-btn .share-icon{ width:13px; height:13px; }
+  .result-share-row + .chart-frame{ border-top-right-radius:0; }
+  .result-share-row + .chart-unavailable{ margin-top:0; }
+  .shared-banner{
+    display:none; margin:0 0 14px; padding:10px 14px; border:1px solid var(--teal); border-radius:8px;
+    font-size:12.5px; color:var(--text-primary); line-height:1.5;
+  }
+  .shared-banner.visible{ display:block; }
+  .shared-banner strong{ color:var(--teal); }
+
+  /* Buttons (App-Conventions §3c) */
+  .btn{
+    font:500 13px 'IBM Plex Sans', sans-serif; padding:10px 16px; border-radius:6px;
+    border:1px solid var(--bezel-hi); background:transparent; color:var(--text-muted); cursor:pointer;
+    transition:color .15s ease, border-color .15s ease;
+  }
+  .btn:hover{ color:var(--amber); border-color:var(--amber); }
+  .btn:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+  .btn.primary{ color:var(--amber); border-color:var(--amber-dim); background:rgba(245,166,35,0.08); }
+  /* Keyboard focus for the app's own (non-.btn) controls */
+  button:focus-visible, a:focus-visible, .radio-option:focus-within,
+  .contrib-table tr.contrib-row:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+
+  /* Heat-map rows open the per-condition pop-up */
+  .contrib-table tr.contrib-row{ cursor:pointer; }
+  .contrib-table tr.contrib-row:hover td.contrib-label,
+  .contrib-table tr.contrib-row:focus-visible td.contrib-label{ color:var(--amber); }
+  .contrib-table tr.contrib-row:hover td.contrib-cell,
+  .contrib-table tr.contrib-row:active td.contrib-cell{ filter:brightness(1.25); }
+  .contrib-table tr.contrib-row:active td.contrib-label{ color:var(--amber); }
+  .contrib-hint{ font-size:12px; color:var(--teal); margin:0 0 8px; }
+  .contrib-table td.contrib-label .row-go{ color:var(--amber); margin-left:5px; }
+  .contrib-table tr.contrib-row.unavailable{ cursor:default; }
+  .contrib-table tr.contrib-row.unavailable td.contrib-label{ color:var(--text-muted); }
+  .contrib-table tr.contrib-row.unavailable:hover td.contrib-label{ color:var(--text-muted); }
+  .chart-unavailable{ display:none; padding:28px 16px; text-align:center; font-size:12.5px; line-height:1.6; color:var(--text-muted);
+    background:var(--bg-deep); border:1px solid var(--bezel); border-radius:8px; }
+  .chart-unavailable.visible{ display:block; }
+  .chart-frame.hidden{ display:none; }
+
+  /* Condition pop-up */
+  .cond-modal{
+    position:fixed; inset:0; z-index:50;
+    display:none; align-items:center; justify-content:center;
+    padding:calc(env(safe-area-inset-top, 0px) + 12px) 12px calc(env(safe-area-inset-bottom, 0px) + 12px);
+    background:rgba(8,10,14,0.72);
+  }
+  .cond-modal.open{ display:flex; }
+  .cond-dialog{
+    width:100%; max-width:760px; max-height:100%; overflow-y:auto;
+    background:var(--bg-panel); border:1px solid var(--bezel-hi); border-radius:8px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.55);
+    padding:16px 16px 14px;
+    touch-action:pan-y;
+  }
+  .cond-head{ display:flex; align-items:flex-start; gap:12px; margin-bottom:12px; }
+  .cond-head-text{ flex:1; min-width:0; }
+  .cond-kicker{ font-size:10.5px; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:3px; }
+  .cond-title{ font-size:15px; font-weight:600; margin:0; }
+  .cond-desc{ font-size:12px; color:var(--text-muted); margin-top:3px; line-height:1.5; }
+  .cond-close{ padding:6px 11px; font-size:15px; line-height:1; }
+  .cond-meta{ font-size:11.5px; color:var(--text-muted); margin-bottom:10px; line-height:1.6; }
+  .cond-empty{ display:none; padding:40px 12px; text-align:center; font-size:12.5px; color:var(--text-muted); }
+  .cond-nav{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; }
+  .cond-nav .btn{ padding:8px 14px; }
+  .cond-pos{ font-size:11.5px; color:var(--text-muted); }
+  html.modal-open, html.modal-open body{ overflow:hidden; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+</head>
+<body>
+
+<div class="rig">
+  <div class="title-row">
+    <h1>Weather History and Probability</h1>
+    <span class="ver mono">v0.17</span>
+  </div>
+
+  <div class="purpose-line"><span class="purpose-label">Purpose of this app:</span>&nbsp; pull historical NOAA weather for any US, Mexican or Canadian airport and estimate the odds of favorable flying conditions — low cloud layer, VFR, fog, or convection — for a chosen date range and time window</div>
+
+  <div class="shared-banner" id="sharedBanner"></div>
+
+  <div class="demo-banner" id="demoBanner"><strong>DEMO MODE</strong> — dummy data, not real weather. Use this to check the app locally; the live site fetches from NOAA.</div>
+
+  <div class="panel">
+
+    <!-- Step 1: Airport -->
+    <div class="step">
+      <div class="step-body">
+        <h2>Airport</h2>
+        <p class="hint">Search by ICAO identifier, airport name or city. If the station has no usable weather history, we'll suggest a nearby station with a comparable microclimate.</p>
+
+        <div class="compare-head">
+          <label class="small" for="airportInput">AIRPORT 1 <span class="compare-shade-note">(lighter bars)</span></label>
+        </div>
+        <div class="airport-search">
+          <input type="text" id="airportInput" placeholder="e.g. KHAF, Half Moon Bay, MMLT, Loreto, CYVR" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          <button type="button" class="airport-clear" id="airportClear" aria-label="Clear airport">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+          <div class="suggestions" id="suggestions"></div>
+        </div>
+
+        <div class="no-history-note" id="noHistoryNote">
+          <span id="noHistoryText"><span class="code" id="noHistoryCode">0Q5</span> (Shelter Cove) has no on-field weather station. Nearest stations with a comparable coastal/low-cloud-layer profile:</span>
+          <div class="proxy-choice" id="proxyChoice"></div>
+          <div class="custom-station-input" id="customStationInput">
+            <input type="text" placeholder="Enter ICAO identifier" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+          </div>
+        </div>
+
+        <div class="compare-block" id="compareBlock">
+          <div class="compare-head">
+            <label class="small" for="airportInputB">AIRPORT 2 <span class="compare-shade-note">(darker bars)</span></label>
+          </div>
+          <div class="airport-search">
+            <input type="text" id="airportInputB" placeholder="(optional, e.g. KSJC)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <button type="button" class="airport-clear" id="airportClearB" aria-label="Clear second airport">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <div class="suggestions" id="suggestionsB"></div>
+          </div>
+          <div class="no-history-note" id="noHistoryNoteB">
+            <span id="noHistoryTextB"></span>
+            <div class="proxy-choice" id="proxyChoiceB"></div>
+            <div class="custom-station-input" id="customStationInputB">
+              <input type="text" placeholder="Enter ICAO identifier" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            </div>
+          </div>
+        </div>
+
+        <div class="date-range">
+          <label class="small date-range-label">DATE RANGE FOR FETCHING DATA</label>
+          <div class="date-range-fields">
+            <div class="date-field">
+              <label class="small">START</label>
+              <input type="date" id="startDate" value="2021-01-01">
+            </div>
+            <div class="date-arrow">→</div>
+            <div class="date-field">
+              <label class="small">END</label>
+              <input type="date" id="endDate" value="2025-12-31">
+            </div>
+          </div>
+          <div class="date-range-note">Years outside a station's period of record are dropped automatically.</div>
+        </div>
+
+        <div class="csv-upload">
+          <button type="button" class="upload-btn" id="fetchNoaaBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Fetch NOAA data
+          </button>
+          <span class="csv-filename" id="fetchStatus"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Results by (hidden until data is loaded) -->
+    <div class="step results-step" id="resultsStep">
+      <div class="step-body">
+        <h2>Results by</h2>
+        <p class="hint">How should the probability data be grouped?</p>
+
+        <div class="radio-group" id="radioGroup">
+          <label class="radio-option checked">
+            <input type="radio" name="grouping" value="month" checked>
+            <div>
+              <div class="label">Month by month</div>
+              <div class="desc">One data point per calendar month, across all years in range</div>
+            </div>
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="grouping" value="day-in-month">
+            <div>
+              <div class="label">Days within a given month</div>
+              <div class="desc">Day-by-day (1–28/29/30/31) for one selected month, across all years in range</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="month-picker" id="monthPickerWrap">
+          <label class="small">MONTH</label>
+          <select id="monthPicker">
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+            <option value="4">April</option>
+            <option value="5">May</option>
+            <option value="6">June</option>
+            <option value="7">July</option>
+            <option value="8">August</option>
+            <option value="9">September</option>
+            <option value="10" selected>October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
+        </div>
+
+        <div class="time-range">
+          <label class="small">TIME RANGE (LOCAL)</label>
+          <div class="time-range-fields">
+            <select id="startTime" aria-label="Start hour"></select>
+            <span class="date-arrow">→</span>
+            <select id="endTime" aria-label="End hour"></select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="run-row">
+      <button class="run" id="runBtn" disabled>Run analysis</button>
+      <span class="run-status mono" id="runStatus"></span>
+    </div>
+
+    <div class="placeholder-result" id="placeholderResult">
+      Fetch NOAA data above, then run the analysis.
+    </div>
+
+    <div class="result-error" id="resultError"></div>
+
+    <div class="result-panel" id="resultPanel">
+      <div class="result-meta">
+        <span class="mono" id="resStation">—</span> · grouped by <span class="mono" id="resGrouping">—</span> · <span class="mono" id="resStart">—</span> to <span class="mono" id="resEnd">—</span> · <span class="mono" id="resTimeRange">—</span> · <span id="resCount">—</span>
+      </div>
+      <div class="result-share-row">
+        <button type="button" class="result-share-btn" id="shareResultsBtn" title="Share a link that re-runs this analysis">
+          <svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/>
+          </svg>
+          <span>Share Analysis Results</span>
+        </button>
+      </div>
+      <div class="chart-unavailable" id="chartUnavailable"></div>
+      <div class="chart-frame" id="mainChartFrame">
+        <div class="chart-canvas-wrap">
+          <canvas id="resultChart"></canvas>
+        </div>
+      </div>
+
+      <div class="contrib-panel" id="contribPanel">
+        <div class="contrib-desc">Of the hours that weren't all-favorable, how often each factor was part of the problem. <span class="contrib-legend"><span class="contrib-legend-swatch"></span>Red = strongest detractors to flying</span></div>
+        <div class="contrib-hint">Tap a condition &rsaquo; to chart it by itself.</div>
+        <div class="contrib-maps" id="contribMaps">
+          <div class="contrib-map">
+            <div class="contrib-map-head mono" id="contribHead"></div>
+            <div class="contrib-table-wrap">
+              <table class="contrib-table" id="contribTable"></table>
+            </div>
+            <div class="contrib-note" id="contribNote"></div>
+          </div>
+          <div class="contrib-map" id="contribMapB">
+            <div class="contrib-map-head mono" id="contribHeadB"></div>
+            <div class="contrib-table-wrap">
+              <table class="contrib-table" id="contribTableB"></table>
+            </div>
+            <div class="contrib-note" id="contribNoteB"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="temp-panel" id="tempPanel">
+        <div class="temp-head">On the ground: temperature &amp; dew point</div>
+        <div class="temp-desc" id="tempDesc">Bar = mean temperature over the selected hours; white tick = mean dew point. Hover or tap a bar for the spread, % of hours above 30&nbsp;°C, and density altitude.</div>
+        <div class="temp-legend" id="tempLegend"></div>
+        <div class="chart-frame" id="tempChartFrame">
+          <div class="chart-canvas-wrap">
+            <canvas id="tempChart"></canvas>
+          </div>
+        </div>
+        <div class="temp-empty" id="tempEmpty"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="sources">
+    <span class="sources-label">Data source:</span> NOAA NCEI Global Historical Climatology Network-hourly (GHCNh) station observations — <a href="https://www.ncei.noaa.gov/products/global-historical-climatology-network-hourly" target="_blank" rel="noopener">ncei.noaa.gov</a>. GHCNh is worldwide; Mexican and Canadian stations come through the same feed as US ones. Sky-condition classification (CLR/FEW/SCT/BKN/OVC/VV) is parsed directly from each station's raw hourly fields. Mexican and Canadian airport list: <a href="https://ourairports.com/data/" target="_blank" rel="noopener">OurAirports</a> (public domain).
+  </div>
+
+  <div class="disclaimer"><span class="disclaimer-label">Disclaimer:</span> <span class="disclaimer-quote">&ldquo;There are three kinds of lies: lies, damned lies, and statistics.&rdquo;</span> &mdash; Mark Twain</div>
+
+  <footer class="page-footer">
+    <div class="back-link"><a href="https://geezer-geek-pilot-control-panel.netlify.app">&larr; Back to GeezerGeek Pilot Apps</a></div>
+    <div class="credit-line">Wayne McClelland, <a href="https://youtube.com/@GeezerGeekPilot" target="_blank" rel="noopener">GeezerGeek Pilot</a>, <a href="https://docs.google.com/document/d/1chfDa3JBCjsGykGjwrAFwOqMAS7d3_dIY9ieROLCIyU/preview" target="_blank" rel="noopener">Reference Materials</a></div>
+    <div class="hit-counter" id="hitCounter"></div>
+    <button id="shareBtn" class="share-btn" type="button">
+      <svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="18" cy="5" r="3"/>
+        <circle cx="6" cy="12" r="3"/>
+        <circle cx="18" cy="19" r="3"/>
+        <line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/>
+        <line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/>
+      </svg>
+      <span>Share this app with pilot friends</span>
+    </button>
+  </footer>
+</div>
+
+<div class="cond-modal" id="condModal" aria-hidden="true">
+  <div class="cond-dialog" role="dialog" aria-modal="true" aria-labelledby="condTitle">
+    <div class="cond-head">
+      <div class="cond-head-text">
+        <div class="cond-kicker mono">PROBABILITY OF</div>
+        <h3 class="cond-title" id="condTitle">—</h3>
+        <div class="cond-desc" id="condDesc"></div>
+      </div>
+      <button type="button" class="btn cond-close" id="condClose" aria-label="Close">&#x2715;</button>
+    </div>
+    <div class="cond-meta" id="condMeta"></div>
+    <div class="chart-frame">
+      <div class="chart-canvas-wrap" id="condChartWrap"><canvas id="condChart"></canvas></div>
+      <div class="cond-empty" id="condEmpty"></div>
+    </div>
+    <div class="cond-nav">
+      <button type="button" class="btn" id="condPrev" aria-label="Previous condition">&lsaquo; <span id="condPrevLabel"></span></button>
+      <span class="cond-pos mono" id="condPos"></span>
+      <button type="button" class="btn" id="condNext" aria-label="Next condition"><span id="condNextLabel"></span> &rsaquo;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ---- Conditions: ONE list drives the chart labels, heat-map rows and
+  // the per-condition pop-up. The main chart is always "combined"; the six
+  // single conditions are reached by tapping their heat-map row.
+  const METRICS = [
+    { key: 'combined', label: 'All conditions favorable',
+      desc: 'All six conditions favorable in the same hour — an hour with any condition unreported is left out, so the sample is smaller than for any single condition',
+      chartLabel: '% Probability All Conditions Favorable' },
+    { key: 'marine', label: 'Absence of low cloud layer', short: 'Low cloud', heatLabel: 'Low cloud layer',
+      desc: 'Sky condition = CLR/SCT/FEW (no BKN/OVC/obscured layer) — or ceiling ≥ 4000 ft AGL',
+      chartLabel: '% Probability of Sky = CLR/FEW/SCT' },
+    { key: 'vfr', label: 'VFR conditions', short: 'VFR', heatLabel: 'Below VFR mins',
+      desc: 'Ceiling ≥ 3000 ft AGL and visibility ≥ 5 SM',
+      chartLabel: '% Probability of VFR Conditions' },
+    { key: 'fog', label: 'Absence of fog / low visibility', short: 'Fog', heatLabel: 'Fog / low vis',
+      desc: 'Visibility ≥ 3 SM, regardless of cloud cover',
+      chartLabel: '% Probability of No Fog / Low Visibility' },
+    { key: 'convective', label: 'Absence of convective storms', short: 'Storms', heatLabel: 'Convective storms',
+      desc: 'No thunderstorm or funnel cloud/tornado reported in present-weather data',
+      chartLabel: '% Probability of No Convective Storms' },
+    { key: 'precip', label: 'Precipitation: none or light', short: 'Precip', heatLabel: 'Mod+ precipitation',
+      desc: 'No present-weather report of moderate-or-heavier precipitation, any type',
+      chartLabel: '% Probability of No / Light Precipitation' },
+    { key: 'wind', label: 'Light or moderate surface winds', short: 'Wind', heatLabel: 'Strong winds',
+      desc: 'Effective wind (sustained + ½ the gust factor) under 20 kt',
+      chartLabel: '% Probability of Light or Moderate Winds' },
+  ];
+  const METRIC_BY_KEY = Object.fromEntries(METRICS.map(m => [m.key, m]));
+
+  // Small built-in fallback in case airports.json fails to load — keeps the
+  // app usable (including the Shelter Cove no-history/proxy workflow) even
+  // if the fetch is blocked or the file is missing.
+  const FALLBACK_AIRPORTS = [
+    { code: 'KHAF', name: 'Half Moon Bay Airport', hasHistory: true, lat: 37.51333, lon: -122.50111 },
+    { code: 'KACV', name: 'Arcata-Eureka Airport', hasHistory: true, lat: 40.97778, lon: -124.10833 },
+    { code: '0Q5',  name: 'Shelter Cove Airport', hasHistory: false, lat: 40.02778, lon: -124.07333 },
+    { code: 'KFOT', name: 'Rohnerville Airport', hasHistory: true, lat: 40.55389, lon: -124.13278 },
+    { code: 'KUKI', name: 'Ukiah Municipal Airport', hasHistory: true, lat: 39.12583, lon: -123.20083 },
+    { code: 'KSBP', name: 'San Luis Obispo County Airport', hasHistory: true, lat: 35.23556, lon: -120.63850 },
+  ];
+
+  let AIRPORTS = FALLBACK_AIRPORTS;
+
+  function distKm(lat1, lon1, lat2, lon2) {
+    const R = 6371, r = d => d * Math.PI / 180;
+    const a = Math.sin(r(lat2 - lat1) / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(r(lon2 - lon1) / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+  function bearingTo(lat1, lon1, lat2, lon2) {
+    const r = d => d * Math.PI / 180;
+    const y = Math.sin(r(lon2 - lon1)) * Math.cos(r(lat2));
+    const x = Math.cos(r(lat1)) * Math.sin(r(lat2)) - Math.sin(r(lat1)) * Math.cos(r(lat2)) * Math.cos(r(lon2 - lon1));
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+  function compass(deg) { return ['N','NE','E','SE','S','SW','W','NW'][Math.round(deg / 45) % 8]; }
+  function escapeHtml(t) { return String(t).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  const airportsReady = fetch('./airports.json')
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('bad response')))
+    .then(data => { if (Array.isArray(data) && data.length) AIRPORTS = data; })
+    .catch(() => { /* keep FALLBACK_AIRPORTS */ });
+
+  // ---- Airport pickers (v0.13: one slot per airport) ----
+  // Slot A is the main airport; slot B is the optional "compare with"
+  // airport (field always shown since v0.14; left blank = airport 1 alone). Each slot has its own search box, suggestions, nearby-station
+  // proxy chips and custom-station box, and its own fetched data.
+  function makeSlot(sfx) {
+    const $ = id => document.getElementById(id + sfx);
+    const s = {
+      sfx,
+      input: $('airportInput'), clearBtn: $('airportClear'), suggestionsEl: $('suggestions'),
+      noHistoryNote: $('noHistoryNote'), noHistoryText: $('noHistoryText'), proxyChoice: $('proxyChoice'),
+      customStationInput: $('customStationInput'),
+      proxyOptions: [],          // [{ label, stationId?, airportCode?, lat, lon }]
+      selectedStation: null,
+      selectedCoords: null,
+      selectedStationId: null,   // a specific GHCNh station picked from the nearby list
+      rows: null,                // fetched hourly rows
+      label: null,               // what the current data actually came from, e.g. "MMLT via MXM..."
+      status: ''
+    };
+    s.customEl = s.customStationInput.querySelector('input');
+    return s;
+  }
+  const slotA = makeSlot('');
+  const slotB = makeSlot('B');
+  const compareOn = true; // v0.14: the second field is always on; a blank slot B just means one airport
+
+  // What Fetch would look up for this slot ('' = nothing entered).
+  function slotQuery(s) {
+    return s.customEl.value.trim() || s.selectedStation || s.input.value.trim();
+  }
+  // Slots that currently hold fetched data, A first.
+  function loadedSlots() {
+    return [slotA, slotB].filter(s => s.rows && s.rows.length > 0 && (s === slotA || compareOn));
+  }
+
+  // Fills a slot's "no station here" note with proxy chips. Each option is
+  // either one of our airports (airportCode) or a specific GHCNh station
+  // from the live nearby search (stationId).
+  function showProxyChoices(s, textHtml, options) {
+    s.noHistoryText.innerHTML = textHtml;
+    s.proxyOptions = options;
+    s.proxyChoice.innerHTML = options.map((o, i) =>
+      `<div class="proxy-chip" data-idx="${i}">${escapeHtml(o.label)}</div>`).join('')
+      + '<div class="proxy-chip custom" data-idx="custom">Enter my own station →</div>';
+    s.customStationInput.classList.remove('visible');
+    s.noHistoryNote.classList.add('visible');
+  }
+
+  // Shelter Cove keeps its hand-picked proxies (comparable coastal profile);
+  // any other airport flagged as having no history gets the nearest
+  // airports in our list that do.
+  function proxiesForAirport(airport) {
+    if (airport.code === '0Q5') {
+      return [
+        { label: 'KACV — Arcata-Eureka (48 nm N)', airportCode: 'KACV' },
+        { label: 'KFOT — Rohnerville (18 nm NE, inland)', airportCode: 'KFOT' },
+      ];
+    }
+    return AIRPORTS.filter(a => a.hasHistory && a.code !== airport.code)
+      .map(a => ({ a, d: distKm(airport.lat, airport.lon, a.lat, a.lon) }))
+      .sort((x, y) => x.d - y.d).slice(0, 3)
+      .map(({ a, d }) => ({ label: `${a.code} — ${a.name} (${Math.round(d / 1.852)} nm ${compass(bearingTo(airport.lat, airport.lon, a.lat, a.lon))})`, airportCode: a.code, lat: a.lat, lon: a.lon }));
+  }
+
+  // ---- Demo mode: dummy data so the app can be checked locally, where
+  // the Netlify functions don't run. On with ?demo=1, or automatically
+  // when the functions can't be reached and the page isn't on netlify.app.
+  let DEMO = new URLSearchParams(location.search).get('demo') === '1';
+  const demoBanner = document.getElementById('demoBanner');
+  function setDemo(on) { DEMO = on; demoBanner.classList.toggle('visible', on); }
+  setDemo(DEMO);
+
+  function updateFetchButtonState() {
+    fetchNoaaBtn.classList.toggle('ready', !!slotQuery(slotA));
+  }
+
+  function resetForNewAirportSearch() {
+    // Going back to an Airport field means the previously fetched data
+    // and any analysis shown are about to be replaced — clear them rather
+    // than leave stale results visible.
+    slotA.rows = null;
+    slotB.rows = null;
+    document.getElementById('sharedBanner').classList.remove('visible');
+    updateRunButtonState(); // disables Run analysis, hides the Results step
+    fetchNoaaBtn.classList.remove('ready');
+    fetchStatusEl.textContent = '';
+    document.getElementById('resultPanel').classList.remove('visible');
+    document.getElementById('resultError').classList.remove('visible');
+    document.getElementById('placeholderResult').classList.remove('visible');
+  }
+
+  function clearSlotPick(s) {
+    s.customEl.value = '';
+    s.selectedStation = null;
+    s.selectedCoords = null;
+    s.selectedStationId = null;
+    s.viaCode = null;
+    s.noHistoryNote.classList.remove('visible');
+    s.customStationInput.classList.remove('visible');
+  }
+
+  function wireSlot(s) {
+    s.input.addEventListener('focus', () => {
+      resetForNewAirportSearch();
+      s.input.select(); // tapping back into an already-filled field selects it all, so typing immediately replaces it
+      updateFetchButtonState();
+    });
+
+    s.clearBtn.addEventListener('click', () => {
+      if (s === slotB) { clearCompareAirport(); return; }
+      s.input.value = '';
+      clearSlotPick(s);
+      s.suggestionsEl.classList.remove('visible');
+      s.clearBtn.classList.remove('visible');
+      updateFetchButtonState();
+      resetForNewAirportSearch();
+      s.input.focus();
+    });
+
+    s.input.addEventListener('input', () => {
+      // Accent-insensitive: "utqiagvik" finds Utqiaġvik, "queretaro" finds Querétaro.
+      const fold = t => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+      const q = fold(s.input.value.trim());
+      clearSlotPick(s);
+      updateFetchButtonState();
+      s.clearBtn.classList.toggle('visible', s.input.value.length > 0);
+      if (!q) { s.suggestionsEl.classList.remove('visible'); return; }
+
+      // Alaska/Hawaii airports are listed under their ICAO code (PAYA, PHNL);
+      // their FAA ID (YAK) and the old K-prefixed form (KYAK) still find them.
+      const altIds = a => a.faa ? [a.faa.toLowerCase(), 'k' + a.faa.toLowerCase()] : [];
+      // Rank: exact ID (incl. FAA/old-K form) → airport name match → city-only
+      // match; within each, ICAO-coded airports (4 letters) ahead of FAA-ID strips.
+      const rank = a => {
+        if (a.code.toLowerCase() === q || altIds(a).includes(q)) return 0;
+        const icaoBump = /^[A-Z]{4}$/.test(a.code) ? 0 : 0.5;
+        if (a.code.toLowerCase().includes(q) || altIds(a).some(id => id.includes(q))) return 1 + icaoBump;
+        if (fold(a.name).includes(q)) return 2 + icaoBump;
+        return 3 + icaoBump; // city only
+      };
+      const matches = AIRPORTS.filter(a =>
+        a.code.toLowerCase().includes(q) ||
+        (a._txt ??= fold(a.name + ' | ' + (a.city || ''))).includes(q) ||
+        altIds(a).some(id => id.includes(q))
+      ).map(a => ({ a, r: rank(a) })).sort((x, y) => x.r - y.r).map(x => x.a);
+
+      if (matches.length === 0) {
+        s.suggestionsEl.innerHTML = `<div class="suggestion-row no-match">No match in our short list — you can still type any ICAO code and click Fetch below.</div>`;
+        s.suggestionsEl.classList.add('visible');
+        return;
+      }
+
+      s.suggestionsEl.innerHTML = matches.map(a =>
+        `<div class="suggestion-row" data-idx="${AIRPORTS.indexOf(a)}">
+           <span class="code">${a.code}</span>
+           <span class="name">${a.name}${a.city ? ` (${escapeHtml(a.city)})` : ''}</span>
+         </div>`
+      ).join('');
+      s.suggestionsEl.classList.add('visible');
+    });
+
+    s.suggestionsEl.addEventListener('click', (e) => {
+      const row = e.target.closest('.suggestion-row');
+      if (!row || row.classList.contains('no-match')) return;
+      // Index, not code: a few Alaska FAA IDs (e.g. CSR) repeat a Mexican local code.
+      const airport = AIRPORTS[parseInt(row.dataset.idx, 10)];
+      if (!airport) return;
+      s.input.value = `${airport.code} — ${airport.name}`;
+      s.customEl.value = '';
+      s.clearBtn.classList.add('visible');
+      s.suggestionsEl.classList.remove('visible');
+
+      s.selectedStationId = null;
+      if (!airport.hasHistory) {
+        const intro = airport.code === '0Q5'
+          ? `<span class="code">0Q5</span> (Shelter Cove) has no on-field weather station. Nearest stations with a comparable coastal/low-cloud-layer profile:`
+          : `<span class="code">${escapeHtml(airport.code)}</span> has no on-field weather station. Nearest airports with weather history:`;
+        showProxyChoices(s, intro, proxiesForAirport(airport));
+        s.selectedStation = null;
+        s.selectedCoords = null;
+      } else {
+        s.selectedStation = airport.code;
+        s.selectedCoords = { lat: airport.lat, lon: airport.lon };
+      }
+      updateFetchButtonState();
+    });
+
+    s.customEl.addEventListener('input', updateFetchButtonState);
+
+    s.proxyChoice.addEventListener('click', (e) => {
+      const chip = e.target.closest('.proxy-chip');
+      if (!chip) return;
+      s.proxyChoice.querySelectorAll('.proxy-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+      s.selectedStationId = null;
+      s.viaCode = null;
+      if (chip.dataset.idx === 'custom') {
+        s.customStationInput.classList.add('visible');
+        s.selectedStation = null;
+        s.selectedCoords = null;
+      } else {
+        s.customStationInput.classList.remove('visible');
+        const o = s.proxyOptions[parseInt(chip.dataset.idx, 10)];
+        if (o.stationId) {
+          s.selectedStationId = o.stationId;
+          s.selectedStation = o.stationId;
+          s.selectedCoords = { lat: o.lat, lon: o.lon };
+        } else {
+          s.selectedStation = o.airportCode;
+          const proxyAirport = AIRPORTS.find(a => a.code === o.airportCode);
+          s.selectedCoords = (o.lat != null) ? { lat: o.lat, lon: o.lon } : proxyAirport ? { lat: proxyAirport.lat, lon: proxyAirport.lon } : null;
+        }
+      }
+      updateFetchButtonState();
+    });
+  }
+  wireSlot(slotA);
+  wireSlot(slotB);
+
+  // ✕ on the second airport (v0.14, took over the old "Remove" button):
+  // empties slot B, drops its data and re-runs the analysis for airport 1
+  // alone, without a refetch.
+  function clearCompareAirport() {
+    slotB.input.value = '';
+    clearSlotPick(slotB);
+    slotB.suggestionsEl.classList.remove('visible');
+    slotB.clearBtn.classList.remove('visible');
+    slotB.rows = null;
+    slotB.label = null;
+    sharedSlots = sharedSlots.slice(0, 1);
+    fetchWarning = slotA.warning || null;
+    if (slotA.rows && slotA.rows.length) {
+      fetchStatusEl.textContent = slotA.status;
+      runAnalysis();
+    }
+  }
+
+  document.querySelectorAll('.radio-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      const input = opt.querySelector('input[type="radio"]');
+      if (!input || input.disabled) return;
+      const group = opt.closest('.radio-group');
+      group.querySelectorAll('.radio-option').forEach(o => o.classList.remove('checked'));
+      opt.classList.add('checked');
+      if (input.name === 'grouping') {
+        document.getElementById('monthPickerWrap').classList.toggle('visible', input.value === 'day-in-month');
+      }
+    });
+  });
+
+  // ---- Data state ----
+  const runBtn = document.getElementById('runBtn');
+
+  function updateRunButtonState() {
+    const hasData = !!slotA.rows && slotA.rows.length > 0;
+    runBtn.disabled = !hasData;
+    document.getElementById('resultsStep').classList.toggle('visible', hasData);
+  }
+
+  function getHourRange() {
+    const startVal = document.getElementById('startTime').value || '10:00';
+    const endVal = document.getElementById('endTime').value || '16:00';
+    let hourStart = parseInt(startVal.split(':')[0], 10);
+    let hourEnd = parseInt(endVal.split(':')[0], 10);
+    if (isNaN(hourStart)) hourStart = 10;
+    if (isNaN(hourEnd)) hourEnd = 16;
+    return { hourStart, hourEnd };
+  }
+
+  // ---- Time range hour pickers (v0.12) ----
+  // Whole-hour dropdowns in place of <input type="time">: the native time
+  // field hid AM/PM behind its clock icon on macOS, and only the hour was
+  // ever used. Labels spell out AM/PM with the 24-hour time beside it. The
+  // end hour can't be set earlier than the start (the analysis has no
+  // overnight wrap); end options before the start are disabled, and moving
+  // the start past the end pulls the end along.
+  const startSel = document.getElementById('startTime');
+  const endSel = document.getElementById('endTime');
+  const hourLabel = h => `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' : 'PM'} (${String(h).padStart(2, '0')}:00)`;
+  for (let h = 0; h < 24; h++) {
+    const v = String(h).padStart(2, '0') + ':00';
+    startSel.add(new Option(hourLabel(h), v));
+    endSel.add(new Option(hourLabel(h), v));
+  }
+  startSel.value = '10:00';
+  endSel.value = '16:00';
+  function enforceHourOrder() {
+    const sh = parseInt(startSel.value, 10);
+    Array.from(endSel.options).forEach(o => { o.disabled = parseInt(o.value, 10) < sh; });
+    if (parseInt(endSel.value, 10) < sh) endSel.value = startSel.value;
+  }
+  startSel.addEventListener('change', enforceHourOrder);
+
+  // ---- Remembered inputs (v0.11) ----
+  // Time range and the "days within a month" month are kept in this
+  // browser's localStorage and restored on the next visit. Per-device only;
+  // if storage is blocked (private mode), the page just uses its defaults.
+  const PREFS_KEY = 'wxhp.prefs.v1';
+  const prefInputs = { startTime: 'startTime', endTime: 'endTime', month: 'monthPicker' };
+  (function restorePrefs() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'); } catch (e) { saved = null; }
+    if (!saved || typeof saved !== 'object') return;
+    // v0.11 saved "HH:MM" from the old time field; keep the hour only.
+    const hourVal = t => (/^\d{2}:\d{2}$/.test(t || '') ? t.slice(0, 2) + ':00' : null);
+    if (hourVal(saved.startTime)) startSel.value = hourVal(saved.startTime);
+    if (hourVal(saved.endTime)) endSel.value = hourVal(saved.endTime);
+    const mo = parseInt(saved.month, 10);
+    if (mo >= 1 && mo <= 12) document.getElementById('monthPicker').value = String(mo);
+  })();
+  enforceHourOrder();
+  function savePrefs() {
+    const prefs = {};
+    for (const [k, id] of Object.entries(prefInputs)) prefs[k] = document.getElementById(id).value;
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* storage blocked: nothing to do */ }
+  }
+  Object.values(prefInputs).forEach(id => document.getElementById(id).addEventListener('change', savePrefs));
+
+  // ---- Station API: the Netlify function, or dummy data in demo mode ----
+  const ON_NETLIFY = /\.netlify\.app$/.test(location.hostname);
+  async function callStationApi(params) {
+    if (!DEMO) {
+      try {
+        const res = await fetch(`/.netlify/functions/fetch-station?${new URLSearchParams(params)}`);
+        const ctype = res.headers.get('content-type') || '';
+        if (ctype.includes('application/json')) return { res, data: await res.json() };
+        if (ON_NETLIFY) return { res, data: { error: `Unexpected response (HTTP ${res.status})` } };
+      } catch (err) {
+        if (ON_NETLIFY) throw err;
+      }
+      // Off Netlify and the function isn't there (local file or plain
+      // web server): switch to dummy data rather than fail.
+      setDemo(true);
+    }
+    return demoStationApi(params);
+  }
+
+  // Dummy responses shaped like the real function's. A 4-letter ICAO-style
+  // code "has" an on-field station; anything else (e.g. a Mexican strip's
+  // 3-letter code, 0Q5) has none, so the nearby-station proxy flow can be
+  // checked too. The weather numbers are invented, seeded so the same
+  // airport and year always give the same result.
+  function demoRng(seedStr) {
+    let h = 2166136261;
+    for (const ch of seedStr) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+    return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; };
+  }
+  // Same dry-air density-altitude formula as fetch-station.js (demo only).
+  function demoDensityAltFt(stnHpa, tempC) {
+    const da = 145442.16 * (1 - Math.pow((17.326 * stnHpa * 0.0295300) / (459.67 + tempC * 9 / 5 + 32), 0.235));
+    return Math.round(da / 10) * 10;
+  }
+  async function demoStationApi(params) {
+    await new Promise(r => setTimeout(r, 120));
+    const ok = (data) => ({ res: { ok: true, status: 200 }, data });
+    const lat = parseFloat(params.lat), lon = parseFloat(params.lon);
+    if (params.action === 'resolve') {
+      if (params.station) return ok({ candidates: [{ id: params.station, distanceKm: null, lat: isNaN(lat) ? null : lat, lon: isNaN(lon) ? null : lon }] });
+      const code = (params.icao || '').toUpperCase();
+      if (/^[A-Z]{4}$/.test(code) && !isNaN(lat)) return ok({ candidates: [{ id: 'DEMO-' + code, distanceKm: 0.4, lat, lon }] });
+      if (isNaN(lat)) return ok({ candidates: [{ id: 'DEMO-' + (code || 'XXXX'), distanceKm: null, lat: null, lon: null }] });
+      const nearby = AIRPORTS.filter(a => /^[A-Z]{4}$/.test(a.code))
+        .map(a => ({ a, d: distKm(lat, lon, a.lat, a.lon) })).filter(x => x.d <= 250)
+        .sort((x, y) => x.d - y.d).slice(0, 5)
+        .map(({ a, d }) => ({ id: 'DEMO-' + a.code, name: a.name, distanceKm: d, bearing: bearingTo(lat, lon, a.lat, a.lon), lat: a.lat, lon: a.lon }));
+      return ok({ candidates: [], nearby, maxMatchKm: 15 });
+    }
+    const year = parseInt(params.year, 10);
+    const rnd = demoRng(params.station + ':' + year);
+    const absLat = isNaN(lat) ? 35 : Math.abs(lat);
+    const rows = [];
+    const noSky = /^DEMO-C/.test(params.station || '');
+    const demoElevFt = Math.round(demoRng('elev:' + params.station)() * 3000); // fake field elevation per station
+    for (let m = 1; m <= 12; m++) {
+      const days = new Date(year, m, 0).getDate();
+      const summer = Math.cos((m - 7) / 12 * 2 * Math.PI); // +1 Jul, -1 Jan
+      for (let d = 1; d <= days; d++) {
+        for (let h = 0; h < 24; h++) {
+          const morning = h >= 5 && h <= 10 ? 1 : 0;
+          const pClear = Math.min(0.92, Math.max(0.2, 0.62 + 0.12 * summer - 0.004 * (absLat - 30) - 0.18 * morning));
+          const clear = rnd() < pClear;
+          const ceilingFt = clear ? null : Math.round(300 + rnd() * 6000);
+          const lowVis = rnd() < (morning ? 0.08 : 0.02);
+          const visibilitySM = lowVis ? Math.round(rnd() * 25) / 10 : 10;
+          const afternoon = h >= 12 && h <= 19 ? 1 : 0;
+          const noConvective = !(rnd() < Math.max(0, 0.05 * summer) * afternoon);
+          const precipIn = rnd() < 0.08 ? Math.round((0.01 + Math.pow(rnd(), 3) * 0.6) * 100) / 100 : 0;
+          const noModPrecip = precipIn < 0.10;
+          const windKt = Math.round((4 + 8 * afternoon + Math.pow(rnd(), 2) * 22) * 10) / 10;
+          const windFavorable = windKt < 20;
+          // v0.17: temperature, dew point (deg C) and density altitude
+          const tempC = Math.round((16 + 10 * summer - 0.8 * (absLat - 30) + 6 * Math.cos((h - 15) / 24 * 2 * Math.PI) + (rnd() - 0.5) * 9 - demoElevFt / 1000 * 2) * 10) / 10;
+          const dewC = Math.round((tempC - 2 - rnd() * 13) * 10) / 10;
+          const dewPointF = Math.round(dewC * 9 / 5 + 32);
+          const stnHpa = 1013.25 * Math.pow(1 - 6.8756e-6 * demoElevFt, 5.2559) + (rnd() - 0.5) * 12;
+          const daFt = rnd() < 0.03 ? null : demoDensityAltFt(stnHpa, tempC);
+          const extra = { noConvective, noModPrecip, windFavorable, windKt, precipIn, dewPointF, tempC, dewC, daFt };
+          // Canadian demo stations mimic a no-cloud-data source (like CYYZ's live record)
+          if (noSky) rows.push({ year, month: m, day: d, hour: h, clear: null, ceilingFt: null, visibilitySM, ...extra });
+          else rows.push({ year, month: m, day: d, hour: h, clear, ceilingFt: clear ? 72178 : ceilingFt, visibilitySM, ...extra });
+        }
+      }
+    }
+    return ok({ station: params.station, year, timeZone: 'demo — local time', ok: true, count: rows.length, skippedNoSkyData: noSky ? rows.length : 0, reportTypeCounts: { DEMO: rows.length }, daSourceCounts: { station: rows.filter(r => r.daFt !== null).length, altimeter: 0, none: rows.filter(r => r.daFt === null).length }, samplePresWx: [], convectiveSamples: [], totalPresWxNonEmpty: 0, rows });
+  }
+
+  // ---- Fetch from NOAA (Netlify function backend) ----
+  const fetchNoaaBtn = document.getElementById('fetchNoaaBtn');
+  const fetchStatusEl = document.getElementById('fetchStatus');
+  const MAX_FETCH_YEARS = 15;
+
+  // Fetches one slot's station data. Resolves with { ok: true } after
+  // filling s.rows / s.label / s.warning / s.status; with { proxy: true }
+  // when the airport has no station and proxy chips were offered; throws
+  // on failure. setStatus() redraws the shared status line.
+  async function fetchSlot(s, years, setStatus) {
+    const customVal = s.customEl.value.trim();
+    const query = slotQuery(s);
+    const icao = query.split('—')[0].trim().toUpperCase(); // strip the " — Name" suffix if a suggestion was clicked
+    const startYear = years[0], endYear = years[years.length - 1];
+    s.rows = null; s.label = null; s.warning = null;
+
+    // Even if no dropdown suggestion was clicked, check our own airport
+    // list for an exact code match (trying a "K" + 3-char prefix too,
+    // e.g. typing "L52" should still find "KL52" / Oceano) so a directly
+    // typed-and-fetched code still gets reliable coordinate-based
+    // resolution instead of falling back to NOAA's riskier global
+    // name-search.
+    let coordsToUse = s.selectedCoords;
+    if (!coordsToUse) {
+      let exactMatch = AIRPORTS.find(a => a.code === icao);
+      if (!exactMatch && icao.length === 3) exactMatch = AIRPORTS.find(a => a.code === 'K' + icao);
+      // Alaska/Hawaii: typed FAA ID (YAK) or old K form (KYAK) → PAYA
+      if (!exactMatch) exactMatch = AIRPORTS.find(a => a.faa && (a.faa === icao || 'K' + a.faa === icao));
+      if (exactMatch) coordsToUse = { lat: exactMatch.lat, lon: exactMatch.lon };
+    }
+
+    // Step 1: resolve candidate station(s). Coordinate-based lookups can
+    // return several ranked candidates, since multiple station IDs can
+    // share near-identical coordinates in this dataset (e.g. a station
+    // replaced/re-registered over the years) — the physically nearest
+    // one isn't always the one that actually has GHCNh coverage.
+    s.status = `${icao}: looking up station…`; setStatus();
+    // startYear/endYear let the function skip station IDs with no file
+    // for this range (NOAA lists many retired IDs at the same site).
+    const resolveParams = { action: 'resolve', icao, startYear, endYear };
+    if (s.selectedStationId && !customVal) { delete resolveParams.icao; resolveParams.station = s.selectedStationId; }
+    if (coordsToUse) { resolveParams.lat = coordsToUse.lat; resolveParams.lon = coordsToUse.lon; }
+    const { res: resolveRes, data: resolveData } = await callStationApi(resolveParams);
+    if (!resolveRes.ok) throw new Error(resolveData.error || `Station lookup failed (HTTP ${resolveRes.status})`);
+    const candidates = resolveData.candidates || [];
+    if (candidates.length === 0) {
+      const nearby = resolveData.nearby || [];
+      if (nearby.length === 0) throw new Error(`No GHCNh station with data for ${startYear}–${endYear} within 250 km of ${icao}.`);
+      // No station on or near the field (common for Mexican strips):
+      // offer the closest stations as proxies instead of failing.
+      // Offer only stations that sit at an airport with an ICAO code
+      // (within 5 km of it in our list) -- those are the METAR sites.
+      // If none are in range, fall back to the raw station list so the
+      // user isn't left with nothing.
+      const icaoAirportAt = (n) => {
+        let best = null, bestD = 5;
+        for (const a of AIRPORTS) {
+          if (!/^[A-Z]{4}$/.test(a.code)) continue;
+          if (Math.abs(a.lat - n.lat) > 0.08 || Math.abs(a.lon - n.lon) > 0.08) continue;
+          const d = distKm(n.lat, n.lon, a.lat, a.lon);
+          if (d < bestD) { bestD = d; best = a; }
+        }
+        return best;
+      };
+      const seen = new Set();
+      let options = [];
+      for (const n of nearby) {
+        const ap = icaoAirportAt(n);
+        if (!ap || seen.has(ap.code) || ap.code === icao) continue;
+        seen.add(ap.code);
+        options.push({ label: `${ap.code} — ${ap.name} · ${Math.round(n.distanceKm / 1.852)} nm ${compass(n.bearing)}`, stationId: n.id, lat: n.lat, lon: n.lon });
+        if (options.length >= 5) break;
+      }
+      const atAirports = options.length > 0;
+      if (!atAirports) {
+        options = nearby.slice(0, 5).map(n => ({
+          label: `${n.id}${n.name ? ' ' + n.name : ''} · ${Math.round(n.distanceKm / 1.852)} nm ${compass(n.bearing)}`,
+          stationId: n.id, lat: n.lat, lon: n.lon }));
+      }
+      const km = resolveData.maxMatchKm || 15;
+      showProxyChoices(s, `<span class="code">${escapeHtml(icao)}</span> has no GHCNh weather station within ${km} km (${Math.round(km / 1.852)} nm). ${atAirports ? 'Nearest airports with weather history' : 'No airport stations nearby; nearest stations'} for ${startYear}–${endYear} — pick one, then Fetch again:`, options);
+      s.status = `${icao}: pick a nearby station`; setStatus();
+      return { proxy: true };
+    }
+
+    // Step 2: try each candidate in order. For each, fan out one small
+    // request per year in parallel — each Netlify function call only
+    // ever fetches a single year's file, so no individual call risks
+    // the platform's execution timeout no matter how wide the date range.
+    // A candidate "wins" as soon as it returns data with usable sky
+    // condition for at least 70% of hours. Otherwise keep going (up to
+    // MAX_CANDIDATES) and use whichever had the best sky coverage --
+    // some co-located IDs (e.g. Canadian climate-network records) may
+    // carry wind/visibility but little or no cloud data, while another
+    // ID at the same field carries the full METAR.
+    const MAX_CANDIDATES = 3;
+    let stationId = null, successful = [], allYearResults = [], triedNotes = [];
+    let best = null;
+    for (const candidate of candidates.slice(0, MAX_CANDIDATES)) {
+      s.status = `${icao}: fetching ${years.length} year(s) from NOAA (${candidate.id})…`; setStatus();
+      const yearResults = await Promise.all(years.map(async (y) => {
+        try {
+          const fetchParams = { station: candidate.id, year: y };
+          if (candidate.lat !== null && candidate.lat !== undefined) { fetchParams.lat = candidate.lat; fetchParams.lon = candidate.lon; }
+          const { res, data } = await callStationApi(fetchParams);
+          if (!res.ok || data.ok === false) return { year: y, ok: false, why: data.error || (data.status ? `HTTP ${data.status}` : `HTTP ${res.status}`) };
+          return { year: y, ok: true, reportTypeCounts: data.reportTypeCounts, rows: data.rows, skippedNoSkyData: data.skippedNoSkyData || 0, timeZone: data.timeZone, samplePresWx: data.samplePresWx, convectiveSamples: data.convectiveSamples, totalPresWxNonEmpty: data.totalPresWxNonEmpty || 0, daSourceCounts: data.daSourceCounts || null };
+        } catch (err) {
+          return { year: y, ok: false, why: 'no usable response (function timeout?)' };
+        }
+      }));
+      const ok = yearResults.filter(r => r.ok);
+      const distNote = candidate.distanceKm !== null && candidate.distanceKm !== undefined
+        ? ` (${candidate.distanceKm.toFixed(1)} km away)` : '';
+      const kept = ok.reduce((n, r) => n + r.rows.length, 0);
+      if (ok.length > 0 && kept > 0) {
+        // "Good enough" = sky data on ≥70% of hours AND at least ~30% of
+        // the hours in the requested years. Otherwise keep looking, and
+        // fall back to the candidate with the most hours that have sky
+        // data (then the most hours overall).
+        const skipped = ok.reduce((n, r) => n + (r.skippedNoSkyData || 0), 0); // hours with no sky data (kept, clear=null)
+        const skyHours = kept - skipped;
+        const skipFrac = skipped / kept;
+        const enough = kept >= ok.length * 8760 * 0.3;
+        if (!best || skyHours > best.skyHours || (skyHours === best.skyHours && kept > best.kept)) best = { id: candidate.id, ok, yearResults, skipFrac, kept, skyHours };
+        if (skipFrac <= 0.3 && enough) break;
+        triedNotes.push(`${candidate.id}${distNote} (${enough ? 'little sky data' : 'sparse'})`);
+        continue;
+      }
+      const firstWhy = (yearResults.find(r => !r.ok && r.why) || {}).why;
+      const reportsSeen = ok.reduce((n, r) => n + Object.values(r.reportTypeCounts || {}).reduce((a, b) => a + b, 0), 0);
+      triedNotes.push(`${candidate.id}${distNote}${ok.length ? ` (files read, ${reportsSeen.toLocaleString()} reports, 0 usable hours)` : firstWhy ? ` (${firstWhy})` : ''}`);
+    }
+    if (best) {
+      stationId = best.id;
+      successful = best.ok;
+      allYearResults = best.yearResults;
+    }
+
+    if (!stationId) {
+      throw new Error(`Tried ${triedNotes.length} candidate station(s) — ${triedNotes.join(', ')} — but none returned data for any requested year (${startYear}-${endYear}). This airport may not have GHCNh coverage for this period.`);
+    }
+
+    const rows = successful.flatMap(r => r.rows);
+    const totalSkipped = successful.reduce((sum, r) => sum + r.skippedNoSkyData, 0);
+    const totalSeen = rows.length; // v0.8: no-sky hours are kept (clear = null), so rows = all hours
+    const missingYears = allYearResults.filter(r => !r.ok).map(r => r.year);
+    const missingNote = missingYears.length ? ` (missing years: ${missingYears.join(', ')})` : '';
+
+    const expectedHours = successful.length * 8760;
+    let warning = null;
+    if (rows.length < expectedHours * 0.3) {
+      // Sparse: e.g. a station that only reports a few times a day, or a
+      // source with gaps. Results are still shown, but flagged.
+      warning = `${stationId} returned only ${rows.length.toLocaleString()} usable hourly observations over ${successful.length} year(s) (a full record is about ${expectedHours.toLocaleString()}). This station reports sparsely or has gaps — treat the percentages below with caution.`;
+    } else if (totalSeen > 0 && totalSkipped === totalSeen) {
+      warning = `${stationId} reports no cloud cover at all (common for Canadian national-network records). Low cloud layer, VFR and "all conditions" can't be computed here; fog/visibility, storms, precipitation and wind below are based on ${rows.length.toLocaleString()} hourly observations.`;
+    } else if (totalSeen > 0 && totalSkipped / totalSeen > 0.3) {
+      // More than 30% of hourly records had no usable sky-condition field
+      // at all — this station's data source likely doesn't report sky
+      // condition reliably. Rather than silently exclude those hours and
+      // present a result that looks complete, say so plainly.
+      const pct = Math.round((totalSkipped / totalSeen) * 100);
+      warning = `${stationId} returned data, but ${pct}% of hourly records had no usable sky-condition field — this station's GHCNh source may not report sky condition reliably. Low-cloud and VFR results below are based only on the ${(totalSeen - totalSkipped).toLocaleString()} hours that did include it; treat them with caution.`;
+    }
+
+    const detectedTz = successful[0].timeZone ? ` [${successful[0].timeZone}]` : '';
+    s.rows = rows;
+    s.label = stationId === icao ? stationId : `${icao} via ${stationId}`;
+    // Short name for legends/tooltips: the airport code typed or picked;
+    // with a nearby-station chip, "L52→KSBP".
+    const inputCode = (customVal || s.input.value.split('—')[0]).trim().toUpperCase() || icao;
+    const chip = s.proxyChoice.querySelector('.proxy-chip.selected');
+    const chipCode = s.viaCode || ((s.selectedStationId && chip) ? (chip.textContent.match(/^([A-Z0-9]{3,4}) —/) || [])[1] : null);
+    s.short = chipCode && chipCode !== inputCode ? `${inputCode}→${chipCode}` : inputCode;
+    s.warning = warning;
+    s.status = `${stationId} — ${rows.length.toLocaleString()} obs fetched${missingNote}${detectedTz}`;
+    setStatus();
+
+    // Diagnostic-only from here down — console output for debugging the
+    // convective-storms metric if it ever misbehaves again; none of this
+    // should land in the user-visible status line, since "no TS/FC in
+    // this particular date range" is the normal/expected case, not an
+    // error worth surfacing on every single fetch.
+    const totalPresWx = successful.reduce((sum, y) => sum + (y.totalPresWxNonEmpty || 0), 0);
+    const allConvectiveSamples = successful.flatMap(y => y.convectiveSamples || []).slice(0, 10);
+    console.log(`[${s.label}] GHCNh report types seen (per year):`, successful.map(y => ({ year: y.year, types: y.reportTypeCounts })));
+    console.log(`[${s.label}] density-altitude pressure source, hours (per year):`, successful.map(y => ({ year: y.year, da: y.daSourceCounts })));
+    console.log(`[${s.label}] Present-weather observations found: ${totalPresWx} non-empty across ${successful.length} year(s) fetched.`);
+    console.log(`[${s.label}] Sample present-weather values (first 15 seen, any type):`, successful[0].samplePresWx || []);
+    console.log(`[${s.label}] Convective (TS/FC) matches found: ${allConvectiveSamples.length ? allConvectiveSamples.length + '+' : 0}`, allConvectiveSamples);
+    return { ok: true };
+  }
+
+  fetchNoaaBtn.addEventListener('click', async () => {
+    if (!slotQuery(slotA)) { showError('Pick or enter an airport first (Step 1).'); return; }
+    const slots = (compareOn && slotQuery(slotB)) ? [slotA, slotB] : [slotA];
+    if (!(compareOn && slotQuery(slotB))) { slotB.rows = null; slotB.label = null; }
+    const pickSnap = slots.map(snapshotSlot); // what a share link must re-fetch
+
+    clearError();
+    fetchWarning = null;
+    fetchNoaaBtn.disabled = true;
+    slots.forEach(s => { s.status = ''; });
+    const setStatus = () => { fetchStatusEl.textContent = slots.map(s => s.status).filter(Boolean).join('  ·  '); };
+
+    let startYear = parseInt(document.getElementById('startDate').value.slice(0, 4), 10);
+    let endYear = parseInt(document.getElementById('endDate').value.slice(0, 4), 10);
+    if (startYear > endYear) [startYear, endYear] = [endYear, startYear];
+    if (endYear - startYear + 1 > MAX_FETCH_YEARS) startYear = endYear - MAX_FETCH_YEARS + 1;
+    const years = [];
+    for (let y = startYear; y <= endYear; y++) years.push(y);
+
+    try {
+      // Both airports are fetched at the same time.
+      const results = await Promise.allSettled(slots.map(s => fetchSlot(s, years, setStatus)));
+      const failures = results.map((r, i) => ({ r, s: slots[i] })).filter(x => x.r.status === 'rejected');
+      const needsProxy = results.some(r => r.status === 'fulfilled' && r.value.proxy);
+      if (failures.length || needsProxy) {
+        const keepStatus = fetchStatusEl.textContent;
+        clearLoadedData(); // never leave the previous airport's data behind a new airport's name
+        fetchStatusEl.textContent = needsProxy ? keepStatus : '';
+        if (failures.length) {
+          const who = s => slots.length > 1 ? ` (${s === slotA ? 'airport 1' : 'airport 2'})` : '';
+          showError(failures.map(({ r, s }) => `NOAA fetch failed${who(s)}: ${r.reason && r.reason.message ? r.reason.message : r.reason}`).join('\n\n'));
+        }
+        return;
+      }
+
+      sharedSlots = pickSnap;
+      fetchWarning = slots.map(s => s.warning).filter(Boolean).join('\n\n') || null;
+      if (!fetchWarning) clearError();
+      setStatus();
+      updateRunButtonState();
+
+      // Run the analysis as soon as data is in, then bring
+      // the result (or the data-quality caution above it) into view.
+      if (runAnalysis()) {
+        const target = fetchWarning ? document.getElementById('resultError') : document.getElementById('resultPanel');
+        requestAnimationFrame(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      }
+    } catch (err) {
+      fetchStatusEl.textContent = '';
+      clearLoadedData();
+      showError(`NOAA fetch failed: ${err.message}`);
+    } finally {
+      fetchNoaaBtn.disabled = false;
+    }
+  });
+
+  // Drop whatever was fetched before: data, chart, heat maps, pop-up state.
+  function clearLoadedData() {
+    [slotA, slotB].forEach(s => { s.rows = null; s.label = null; s.warning = null; });
+    lastRun = null;
+    fetchWarning = null;
+    if (typeof closeCondModal === 'function') closeCondModal();
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    document.getElementById('resultPanel').classList.remove('visible');
+    document.getElementById('contribPanel').classList.remove('visible');
+    document.getElementById('contribNote').classList.remove('visible');
+    document.getElementById('contribNoteB').classList.remove('visible');
+    if (tempChart) { tempChart.destroy(); tempChart = null; }
+    document.getElementById('tempPanel').classList.remove('visible');
+    updateRunButtonState();
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('resultError');
+    el.textContent = msg;
+    el.classList.add('visible');
+    document.getElementById('resultPanel').classList.remove('visible');
+  }
+  function clearError() {
+    document.getElementById('resultError').classList.remove('visible');
+  }
+
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // returns true if (month, day) falls within the [startMD, endMD] calendar window, handling wraparound
+  function inWindow(month, day, startM, startD, endM, endD) {
+    const md = month * 100 + day;
+    const startMD = startM * 100 + startD;
+    const endMD = endM * 100 + endD;
+    if (startMD <= endMD) return md >= startMD && md <= endMD;
+    return md >= startMD || md <= endMD; // wraps across year-end
+  }
+
+  // Determines whether an hour counts as "favorable" for the selected
+  // metric. Returns true/false, or null if this metric can't be
+  // determined for this hour (missing data) -- callers must exclude
+  // null rows rather than guess.
+  //
+  // VFR reuses the already-validated sky_condition classification (r.clear)
+  // to decide whether a ceiling exists at all, since that's more reliable
+  // than trusting the raw ceiling_height number's units/encoding on its
+  // own. The numeric ceiling_height is only consulted when a real
+  // ceiling-forming layer is present and its exact height matters for the
+  // 3000 ft threshold.
+  function computeFavorable(r, metric) {
+    // Favorable if the sky itself is clear/scattered/few, OR there's a
+    // reported cloud layer but it's high enough (≥4000 ft AGL) not to
+    // matter for low-level flying -- a high broken/overcast deck no
+    // longer counts against this metric the way it used to.
+    if (metric === 'marine') {
+      const highCeiling = r.ceilingFt !== null && r.ceilingFt !== undefined && r.ceilingFt >= 4000;
+      if (r.clear === null || r.clear === undefined) return highCeiling ? true : null; // no sky data this hour
+      return r.clear || highCeiling;
+    }
+
+    if (metric === 'vfr') {
+      if (r.visibilitySM === null || r.visibilitySM === undefined) return null;
+      const visOK = r.visibilitySM >= 5;
+      let ceilingOK;
+      if (r.clear === null || r.clear === undefined) {
+        // no sky data: only decidable if a ceiling height was reported
+        if (r.ceilingFt === null || r.ceilingFt === undefined) return null;
+        ceilingOK = r.ceilingFt >= 3000;
+      } else if (r.clear) {
+        ceilingOK = true; // no BKN/OVC/obscured layer at all -> ceiling is effectively unlimited
+      } else if (r.ceilingFt === null || r.ceilingFt === undefined) {
+        return null; // a ceiling exists per sky_condition, but we don't have its height
+      } else {
+        ceilingOK = r.ceilingFt >= 3000;
+      }
+      return visOK && ceilingOK;
+    }
+
+    if (metric === 'fog') {
+      if (r.visibilitySM === null || r.visibilitySM === undefined) return null;
+      return r.visibilitySM >= 3;
+    }
+
+    if (metric === 'convective') return r.noConvective;
+
+    if (metric === 'precip') return r.noModPrecip;
+
+    if (metric === 'wind') return r.windFavorable;
+
+    // Composite: every one of the six individual metrics must be
+    // favorable for this hour. Null-propagating -- if any component metric
+    // can't be determined (e.g. missing wind_speed, or a ceiling exists
+    // but its height wasn't reported), the whole hour is excluded rather
+    // than guessed at, so this metric's usable sample size will often be
+    // smaller than any single metric's own.
+    if (metric === 'combined') {
+      const components = ['marine', 'vfr', 'fog', 'convective', 'precip', 'wind'];
+      let allFavorable = true;
+      for (const m of components) {
+        const sub = computeFavorable(r, m);
+        if (sub === null) return null;
+        if (!sub) allFavorable = false;
+      }
+      return allFavorable;
+    }
+
+    return null;
+  }
+
+  // Bold dashed line at 50% -- the same threshold that decides each bar's
+  // green/red color -- drawn in beforeDatasetsDraw so it renders underneath
+  // the bars rather than on top of them. A small inline plugin rather than
+  // pulling in chartjs-plugin-annotation as a whole extra dependency for
+  // one line.
+  Chart.register({
+    id: 'halfwayLine',
+    beforeDatasetsDraw(chart) {
+      const { ctx, chartArea, scales } = chart;
+      if (!chartArea || !scales.y) return;
+      const min = scales.y.min, max = scales.y.max;
+      if (50 < min || 50 > max) return; // threshold outside the current zoomed axis range
+      const y = scales.y.getPixelForValue(50);
+      ctx.save();
+      ctx.setLineDash([7, 5]);
+      ctx.lineWidth = 1.75;
+      ctx.strokeStyle = 'rgba(231,228,220,0.28)';
+      ctx.beginPath();
+      ctx.moveTo(chartArea.left, y);
+      ctx.lineTo(chartArea.right, y);
+      ctx.stroke();
+      ctx.restore();
+    }
+  });
+
+  let chartInstance = null;
+  let tempChart = null; // v0.17 temperature & dew point chart
+
+  // iOS Safari doesn't always recompute canvas layout synchronously on
+  // orientation change -- a short delay before resize() gives it a beat
+  // to settle on the new viewport dimensions first, avoiding the stale-
+  // size render (title/axis-label overlap) seen when rotating to landscape.
+  window.addEventListener('resize', () => { if (chartInstance) chartInstance.resize(); if (tempChart) tempChart.resize(); });
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => { if (chartInstance) chartInstance.resize(); if (tempChart) tempChart.resize(); }, 200);
+  });
+
+  const CONTRIB_ORDER = METRICS.filter(m => m.key !== 'combined').map(m => m.key);
+  const CONTRIB_LABELS = Object.fromEntries(METRICS.filter(m => m.heatLabel).map(m => [m.key, m.heatLabel]));
+
+  // Generic over both grouping modes -- columns is whatever key set the
+  // main chart already computed for its own x-axis (month names or day
+  // numbers), so the two stay in lockstep automatically rather than this
+  // table hardcoding its own separate notion of "the 12 months."
+  function computeContributors(rows, columns, keyOf, relaxed) {
+    const totals = Array(columns.length).fill(0);
+    const factor = {};
+    CONTRIB_ORDER.forEach(k => { factor[k] = Array(columns.length).fill(0); });
+    let anyUnfavorable = false;
+    rows.forEach(r => {
+      // relaxed (v0.8): used when no hour has all six reported (e.g. a
+      // station with no cloud data) -- an hour counts if any condition that
+      // WAS reported is unfavorable.
+      if (relaxed) {
+        if (!CONTRIB_ORDER.some(k => computeFavorable(r, k) === false)) return;
+      } else if (computeFavorable(r, 'combined') !== false) return;
+      anyUnfavorable = true;
+      const idx = columns.indexOf(keyOf(r));
+      if (idx === -1) return;
+      totals[idx]++;
+      CONTRIB_ORDER.forEach(k => {
+        if (computeFavorable(r, k) === false) factor[k][idx]++;
+      });
+    });
+    return {
+      anyUnfavorable,
+      rows: CONTRIB_ORDER.map(k => ({
+        key: k,
+        label: CONTRIB_LABELS[k],
+        data: factor[k].map((count, i) => totals[i] > 0 ? Math.round((count / totals[i]) * 1000) / 10 : null)
+      }))
+    };
+  }
+
+  function contribCellStyle(v) {
+    if (v === null) return 'contrib-cell no-data';
+    return 'contrib-cell';
+  }
+  function contribCellBg(v) {
+    if (v === null) return '';
+    const alpha = (0.10 + 0.80 * Math.min(v, 100) / 100).toFixed(2);
+    return `background:rgba(224,100,92,${alpha});`;
+  }
+
+  // rowsCombined: hours that can be scored for all six conditions.
+  // counts: how many hours each single condition can be scored for (0 = the
+  // station never reports it in this window, so its row can't be opened).
+  function renderContributors(target, rowsCombined, grouping, columns, counts, relaxed, compare) {
+    const note = target.note;
+    const keyOf = grouping === 'month'
+      ? (r => MONTH_NAMES[r.month - 1])
+      : (r => String(r.day));
+
+    const { anyUnfavorable, rows: contributors } = computeContributors(rowsCombined, columns, keyOf, relaxed);
+
+    // The rows are always drawn: they are the only way into the single
+    // conditions, so they stay even when there is nothing red to show.
+    if (rowsCombined.length > 0 && !anyUnfavorable) {
+      note.textContent = 'Every hour in this window was fully favorable, so nothing shows red.';
+      note.classList.add('visible');
+    } else if (relaxed) {
+      note.textContent = 'This station doesn’t report every condition, so the heat map counts hours where any reported condition was unfavorable. Blank rows = not reported.';
+      note.classList.add('visible');
+    } else {
+      note.classList.remove('visible');
+    }
+
+    const table = target.table;
+    // With up to 31 day-columns, force a sane per-cell floor width and let
+    // the wrapper's overflow-x:auto handle horizontal scroll rather than
+    // squeezing cells down to illegible slivers on a phone. Two month-mode
+    // maps side by side get a slightly narrower label column and floor.
+    const sideBySide = compare && grouping === 'month';
+    const labelW = sideBySide ? 118 : 124;
+    table.style.minWidth = (sideBySide ? Math.max(340, labelW + columns.length * 19) : Math.max(400, labelW + columns.length * 22)) + 'px';
+    const colgroup = `<col style="width:${labelW}px;">` + columns.map(() => '<col>').join('');
+    const thead = '<thead><tr><th></th>' + columns.map(c => `<th>${c}</th>`).join('') + '</tr></thead>';
+    const tbody = '<tbody>' + contributors.map(c => {
+      const available = counts[c.key] > 0;
+      const rowOpen = available
+        ? `<tr class="contrib-row" data-metric="${c.key}" tabindex="0" role="button" aria-label="Chart ${METRIC_BY_KEY[c.key].label} by itself">`
+        : `<tr class="contrib-row unavailable" data-metric="${c.key}" title="Not reported by this station in this window">`;
+      const label = available
+        ? `${c.label}<span class="row-go" aria-hidden="true">&rsaquo;</span>`
+        : `${c.label} — no data`;
+      return rowOpen + `<td class="contrib-label">${label}</td>` +
+        c.data.map(v => `<td class="${contribCellStyle(v)}" style="${contribCellBg(v)}" title="${v === null ? 'No unfavorable hours' : v + '%'}"></td>`).join('') +
+        '</tr>';
+    }).join('') + '</tbody>';
+    table.innerHTML = '<colgroup>' + colgroup + '</colgroup>' + thead + tbody;
+  }
+
+  // ---- Analysis ----
+  // lastRun holds the inputs of the most recent analysis so the
+  // per-condition pop-up charts use exactly the same station, grouping,
+  // date window and hour window.
+  let lastRun = null;
+  let fetchWarning = null; // data-quality caution from the last fetch, re-shown on every run
+
+  const fmtHour = (h) => { const suffix = h < 12 || h === 24 ? 'AM' : 'PM'; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12}:00${suffix}`; };
+
+  function readRunParams() {
+    const grouping = document.querySelector('input[name="grouping"]:checked').value;
+    const startVal = document.getElementById('startDate').value;
+    const endVal = document.getElementById('endDate').value;
+    // Label results with what was actually fetched -- v0.5 used the custom
+    // box's text, which could be stale (hidden but not cleared).
+    const station = slotA.label || slotQuery(slotA) || '—';
+    const { hourStart, hourEnd } = getHourRange();
+    const pickedMonth = parseInt(document.getElementById('monthPicker').value, 10);
+    const p = { grouping, startVal, endVal, station, hourStart, hourEnd, pickedMonth };
+    if (startVal && endVal) {
+      [, p.startM, p.startD] = startVal.split('-').map(Number);
+      [, p.endM, p.endD] = endVal.split('-').map(Number);
+      p.startYear = parseInt(startVal.slice(0, 4), 10);
+      p.endYear = parseInt(endVal.slice(0, 4), 10);
+    }
+    p.groupingLabel = grouping === 'day-in-month' ? `days in ${MONTH_NAMES[pickedMonth - 1]}` : grouping;
+    p.timeRangeLabel = `${fmtHour(hourStart)}-${fmtHour(hourEnd)}`;
+    return p;
+  }
+
+  // Every hour in the window that can be scored for this one metric —
+  // identical to picking that metric's radio button and running it.
+  function filterRows(p, metric, rows) {
+    return (rows || []).filter(r =>
+      r.year >= p.startYear && r.year <= p.endYear &&
+      inWindow(r.month, r.day, p.startM, p.startD, p.endM, p.endD) &&
+      r.hour >= p.hourStart && r.hour <= p.hourEnd &&
+      (p.grouping !== 'day-in-month' || r.month === p.pickedMonth) &&
+      (metric === undefined || computeFavorable(r, metric) !== null)
+    );
+  }
+
+  // Bucket key of a row (month name or day number) and the x-axis labels
+  // for one or two airports: the union of each airport's keys, in order.
+  const bucketKeyOf = p => (p.grouping === 'month' ? (r => MONTH_NAMES[r.month - 1]) : (r => String(r.day)));
+  function unionLabels(p, keyLists) {
+    const all = new Set(keyLists.flat());
+    const order = p.grouping === 'month' ? MONTH_NAMES : Array.from({ length: 31 }, (_, i) => String(i + 1));
+    return order.filter(k => all.has(k));
+  }
+  // groupRows' percentages laid onto a given label list (null = no hours there).
+  function pctAligned(rows, p, metric, labels) {
+    const { sortedKeys, pctData } = groupRows(rows, p, metric);
+    const byKey = new Map(sortedKeys.map((k, i) => [k, pctData[i]]));
+    return labels.map(k => (byKey.has(k) ? byKey.get(k) : null));
+  }
+
+  function groupRows(rows, p, metric) {
+    const buckets = new Map(); // key -> {total, favorable, sortKey}
+    rows.forEach(r => {
+      const key = p.grouping === 'month' ? MONTH_NAMES[r.month - 1] : String(r.day);
+      const sortKey = p.grouping === 'month' ? r.month : r.day;
+      if (!buckets.has(key)) buckets.set(key, { total: 0, favorable: 0, sortKey });
+      const b = buckets.get(key);
+      b.total++;
+      if (computeFavorable(r, metric)) b.favorable++;
+    });
+    const sortedKeys = Array.from(buckets.keys()).sort((a, b) => buckets.get(a).sortKey - buckets.get(b).sortKey);
+    const pctData = sortedKeys.map(k => Math.round((buckets.get(k).favorable / buckets.get(k).total) * 1000) / 10);
+    return { sortedKeys, pctData };
+  }
+
+  // ---- Span hover (v0.10) ----
+  // Each single-condition bar's tooltip shows the spread of that condition's
+  // key parameter over the same hours the bar is built from:
+  // +1σ (84th percentile), mean, median, −1σ (16th percentile). The 16th/84th
+  // percentiles equal mean ± 1σ for a bell curve, but stay inside the values
+  // actually reported for lopsided data (ceilings bunch low, visibility sits
+  // at the 10 SM cap). Percentiles use linear interpolation.
+  const UNLIMITED_CEILING_FT = 70000; // GHCNh codes unlimited as 22000 m (72,178 ft)
+  const SPAN_MIN_HOURS = 5;
+  const SPAN_PARAM = {
+    marine: { name: 'Ceiling', unit: 'ft AGL', kind: 'ceiling' },
+    vfr: { name: 'Ceiling', unit: 'ft AGL', kind: 'ceiling' },
+    fog: { name: 'Visibility', unit: 'SM', get: r => r.visibilitySM, fmt: v => v.toFixed(1) },
+    convective: { name: 'Dew point', unit: '°F', note: 'moisture proxy', get: r => r.dewPointF, fmt: v => Math.round(v).toString() },
+    precip: { name: 'Precip, hours with any', unit: 'in/hr', kind: 'precip', fmt: v => v.toFixed(2) },
+    wind: { name: 'Effective wind', unit: 'kt', get: r => r.windKt, fmt: v => Math.round(v).toString() }
+  };
+  const fmtFt = v => (Math.round(v / 100) * 100).toLocaleString();
+
+  function percentile(sorted, q) {
+    const pos = (sorted.length - 1) * q;
+    const lo = Math.floor(pos), hi = Math.ceil(pos);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+  }
+
+  function spanStats(values) {
+    const v = values.slice().sort((a, b) => a - b);
+    return { n: v.length, p84: percentile(v, 0.84), mean: v.reduce((a, b) => a + b, 0) / v.length, median: percentile(v, 0.5), p16: percentile(v, 0.16) };
+  }
+
+  // Lines for one bar's tooltip. `rows` = that bar's hours for this metric;
+  // `stationHasPrecip` = the station reports the precipitation field at all.
+  // compact (two airports in one tooltip): 2 lines for the four numbers,
+  // indented under that airport's line.
+  function spanLines(metric, rows, stationHasPrecip, compact) {
+    const sp = SPAN_PARAM[metric];
+    if (!sp) return [];
+    if (!rows || rows.length === 0) return compact ? ['  no hours here'] : ['', 'No hours in this bar'];
+    let values = [], extra = null, countNote = '';
+    if (sp.kind === 'ceiling') {
+      let none = 0;
+      rows.forEach(r => {
+        const c = r.ceilingFt;
+        if (r.clear === true || (c !== null && c !== undefined && c >= UNLIMITED_CEILING_FT)) none++;
+        else if (c !== null && c !== undefined) values.push(c);
+      });
+      const known = values.length + none;
+      if (known > 0) extra = `No ceiling: ${Math.round(none / known * 100)}% of hours`;
+      countNote = `${values.length.toLocaleString()} hrs with a ceiling`;
+    } else if (sp.kind === 'precip') {
+      if (!stationHasPrecip) return compact ? ['  precip amount not reported'] : ['', 'Precip amount: not reported by this station'];
+      values = rows.map(r => r.precipIn).filter(v => v !== null && v !== undefined && v > 0);
+      extra = `Hours with any precip: ${(values.length / rows.length * 100).toFixed(1)}%`;
+      countNote = `${values.length.toLocaleString()} hrs`;
+    } else {
+      values = rows.map(sp.get).filter(v => v !== null && v !== undefined);
+      countNote = `${values.length.toLocaleString()} hrs`;
+    }
+    if (compact) {
+      const out = [`  ${sp.name} ${sp.unit}${sp.note ? ' (' + sp.note + ')' : ''} · ${countNote.replace(' with a ceiling', '')}`];
+      if (values.length < SPAN_MIN_HOURS) out.push(values.length === 0 ? '  no values' : '  too few hours for a span');
+      else {
+        const st = spanStats(values);
+        const f = sp.kind === 'ceiling' ? fmtFt : sp.fmt;
+        out.push(`  +1σ ${f(st.p84)} · mean ${f(st.mean)}`, `  med ${f(st.median)} · −1σ ${f(st.p16)}`);
+      }
+      if (extra) out.push('  ' + extra);
+      return out;
+    }
+    const lines = ['', `${sp.name}, ${sp.unit}`, `  ${sp.note ? sp.note + ' · ' : ''}${countNote}`];
+    if (values.length < SPAN_MIN_HOURS) {
+      lines.push(values.length === 0 ? '  no values' : '  too few hours for a span');
+    } else {
+      const st = spanStats(values);
+      const f = sp.kind === 'ceiling' ? fmtFt : sp.fmt;
+      const w = Math.max(...[st.p84, st.mean, st.median, st.p16].map(x => f(x).length));
+      const pad = x => f(x).padStart(w);
+      lines.push(`+1σ (84th) ${pad(st.p84)}`, `Mean       ${pad(st.mean)}`, `Median     ${pad(st.median)}`, `−1σ (16th) ${pad(st.p16)}`);
+    }
+    if (extra) lines.push(extra);
+    return lines;
+  }
+
+  // One entry per bar, aligned with groupRows' sortedKeys.
+  // allRows = everything fetched for that airport (to tell "station never
+  // reports precip" from "no precip in this window").
+  function spansByBucket(rows, p, metric, sortedKeys, allRows, compact) {
+    const byKey = new Map(sortedKeys.map(k => [k, []]));
+    const keyOf = bucketKeyOf(p);
+    rows.forEach(r => {
+      const key = keyOf(r);
+      if (byKey.has(key)) byKey.get(key).push(r);
+    });
+    const stationHasPrecip = (allRows || []).some(r => r.precipIn !== null && r.precipIn !== undefined);
+    return sortedKeys.map(k => spanLines(metric, byKey.get(k), stationHasPrecip, compact));
+  }
+
+  // Bar colors: green = more likely than not favorable, red = less likely.
+  // Airport 2 in compare mode gets darker shades of the same two colors.
+  const BAR_COLORS = [
+    { good: '#3fb87f', bad: '#e0645c' },   // airport 1
+    { good: '#1d7a4f', bad: '#9e3b35' }    // airport 2 (darker)
+  ];
+
+  // series: [{ name, data:[pct|null], spans?:[[lines]] }] -- one entry per
+  // airport. One series draws exactly like v0.12; two draw grouped bars
+  // with a legend and one tooltip listing both airports.
+  function buildChartConfig({ labels, series, metricLabel, title, subtitle }) {
+    const compare = series.length > 1;
+    // Zoom the y-axis when every value is clustered near the top, so small
+    // real differences aren't flattened by 80 unused points of axis space.
+    // e.g. data all sitting between 80-100% gets a 70-100% axis instead of 0-100%.
+    const values = series.flatMap(s => s.data).filter(v => v !== null && v !== undefined);
+    const dataMin = values.length ? Math.min(...values) : 0;
+    const yAxisMin = dataMin >= 50 ? Math.max(0, Math.floor((dataMin - 10) / 10) * 10) : 0;
+    const anySpans = series.some(s => s.spans);
+    let tooltip = {};
+    if (compare) {
+      tooltip = {
+        mode: 'index', intersect: false,
+        bodyFont: { family: "'IBM Plex Mono', ui-monospace, monospace", size: 11 },
+        callbacks: {
+          label: ctx => ` ${series[ctx.datasetIndex].name}: ${ctx.raw === null || ctx.raw === undefined ? 'no data' : ctx.raw + '% favorable'}`,
+          afterLabel: ctx => (series[ctx.datasetIndex].spans ? series[ctx.datasetIndex].spans[ctx.dataIndex] || [] : [])
+        }
+      };
+    } else if (anySpans) {
+      const spans = series[0].spans;
+      tooltip = {
+        bodyFont: { family: "'IBM Plex Mono', ui-monospace, monospace", size: 11.5 },
+        callbacks: {
+          label: ctx => ` ${ctx.parsed.y}% favorable`,
+          afterBody: items => (items.length ? spans[items[0].dataIndex] || [] : [])
+        }
+      };
+    }
+    return {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: series.map((s, i) => ({
+          label: compare ? s.name : metricLabel,
+          data: s.data,
+          // Each bar colored independently by its own value.
+          backgroundColor: s.data.map(v => (v !== null && v >= 50 ? BAR_COLORS[i].good : BAR_COLORS[i].bad)),
+          borderRadius: 4,
+          maxBarThickness: 34
+        }))
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: compare ? {
+            display: true,
+            position: 'bottom',
+            labels: {
+              color: '#8b93a1', boxWidth: 22, boxHeight: 10, font: { size: 11 },
+              // Swatch = that airport's green; the text says which shade.
+              generateLabels: () => series.map((s, i) => ({
+                text: `${s.name}${i === 0 ? ' — lighter bars' : ' — darker bars'}`,
+                fillStyle: BAR_COLORS[i].good, strokeStyle: BAR_COLORS[i].good, lineWidth: 0,
+                fontColor: '#8b93a1', datasetIndex: i, hidden: false
+              }))
+            }
+          } : { display: false },
+          tooltip,
+          title: {
+            display: !!title,
+            text: title || '',
+            color: '#e7e4dc',
+            font: { size: 12.5, weight: '500' },
+            padding: { bottom: 4 }
+          },
+          subtitle: {
+            display: !!subtitle,
+            text: subtitle || '',
+            color: '#8b93a1',
+            font: { size: 11, weight: '400', style: 'italic' },
+            padding: { bottom: 12 }
+          }
+        },
+        scales: {
+          y: {
+            min: yAxisMin, max: 100,
+            title: { display: true, text: metricLabel, color: '#8b93a1' },
+            ticks: { color: '#8b93a1' },
+            grid: { color: '#2a323f' }
+          },
+          x: {
+            ticks: { color: '#8b93a1', maxRotation: 60, minRotation: labels.length > 12 ? 60 : 0 },
+            grid: { display: false }
+          }
+        }
+      }
+    };
+  }
+
+  function showNotice(msg) {
+    // Like showError, but leaves the results visible (used for the
+    // fetch's data-quality caution).
+    const el = document.getElementById('resultError');
+    el.textContent = msg;
+    el.classList.add('visible');
+  }
+
+  function runAnalysis() {
+    clearError();
+    const p = readRunParams();
+
+    if (!p.startVal || !p.endVal) { showError('Pick a start and end date.'); return false; }
+    if (!slotA.rows || slotA.rows.length === 0) {
+      showError('Fetch NOAA data for a station first (Step 1).');
+      return false;
+    }
+
+    // One entry per airport with data: A, then B in compare mode.
+    const per = loadedSlots().map(s => {
+      const counts = {};
+      CONTRIB_ORDER.forEach(k => { counts[k] = filterRows(p, k, s.rows).length; });
+      const filtered = filterRows(p, 'combined', s.rows);
+      const windowRows = filterRows(p, undefined, s.rows);
+      const keyOf = bucketKeyOf(p);
+      // Columns: hours with all six reported, else (no such hour) every
+      // hour in the window so the heat-map rows can still be drawn and opened.
+      const keys = [...new Set((filtered.length ? filtered : windowRows).map(keyOf))];
+      return { s, counts, filtered, windowRows, keys };
+    });
+    const compare = per.length > 1;
+
+    if (!per.some(x => CONTRIB_ORDER.some(k => x.counts[k] > 0))) {
+      const monthHint = p.grouping === 'day-in-month'
+        ? ` Check that your date range actually includes ${MONTH_NAMES[p.pickedMonth - 1]}.` : '';
+      showError(`No observations in that date/time range with usable data — check the data covers these years/months/hours.${monthHint}`);
+      return false;
+    }
+
+    const m = METRIC_BY_KEY.combined;
+    const labels = unionLabels(p, per.map(x => x.keys));
+    const names = per.map(x => x.s.label || slotQuery(x.s));           // full: "KIZA via USW000…"
+    const shorts = per.map(x => x.s.short || x.s.label || slotQuery(x.s)); // short: "KIZA"
+    p.compare = compare;
+    p.slots = per.map(x => x.s);
+    p.names = names;
+    p.shorts = shorts;
+    const stationText = names.join(' vs ');
+    const titleText = compare ? shorts.join(' vs ') : stationText;
+
+    document.getElementById('resStation').textContent = stationText;
+    document.getElementById('resGrouping').textContent = p.groupingLabel;
+    document.getElementById('resStart').textContent = p.startVal;
+    document.getElementById('resEnd').textContent = p.endVal;
+    document.getElementById('resTimeRange').textContent = p.timeRangeLabel;
+    document.getElementById('resCount').textContent = compare
+      ? per.map((x, i) => `${shorts[i]}: ${x.filtered.length ? x.filtered.length.toLocaleString() + ' obs' : 'no hours with all six reported'}`).join(' · ')
+      : (per[0].filtered.length > 0 ? `${per[0].filtered.length.toLocaleString()} observations` : 'no hours with all six conditions reported');
+
+    document.getElementById('placeholderResult').classList.remove('visible');
+    document.getElementById('resultPanel').classList.add('visible');
+    if (fetchWarning) showNotice(fetchWarning);
+
+    const frame = document.getElementById('mainChartFrame');
+    const unavailable = document.getElementById('chartUnavailable');
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+    const missingFor = x => CONTRIB_ORDER.filter(k => x.counts[k] === 0).map(k => METRIC_BY_KEY[k].short.toLowerCase());
+    const charted = per.filter(x => x.filtered.length > 0);
+    if (charted.length > 0) {
+      frame.classList.remove('hidden');
+      const chartTitle = p.grouping === 'day-in-month'
+        ? `${m.chartLabel} — ${titleText}, ${MONTH_NAMES[p.pickedMonth - 1]} days, ${p.startVal.slice(0,4)}-${p.endVal.slice(0,4)}, ${p.timeRangeLabel}`
+        : `${m.chartLabel} — ${titleText}, ${p.startVal} to ${p.endVal}, ${p.timeRangeLabel}`;
+      const series = per.map((x, i) => ({
+        name: shorts[i],
+        data: x.filtered.length ? pctAligned(x.filtered, p, 'combined', labels) : labels.map(() => null)
+      }));
+      chartInstance = new Chart(document.getElementById('resultChart'), buildChartConfig({
+        labels, series, metricLabel: m.chartLabel, title: chartTitle, subtitle: m.desc
+      }));
+      // Compare mode with one airport not chartable: say why its bars are missing.
+      const notCharted = per.filter(x => x.filtered.length === 0);
+      if (notCharted.length) {
+        unavailable.textContent = notCharted.map(x => {
+          const miss = missingFor(x);
+          return `${x.s.short || x.s.label}: all conditions favorable can’t be charted — no hour in this window has all six reported${miss.length ? ` (doesn’t report ${miss.join(', ')})` : ''}. Its conditions can still be charted one at a time below.`;
+        }).join(' ');
+        unavailable.classList.add('visible');
+      } else unavailable.classList.remove('visible');
+    } else {
+      frame.classList.add('hidden');
+      if (compare) {
+        unavailable.textContent = 'All conditions favorable can’t be charted for either airport: no hour in this window has all six conditions reported. Tap a condition below to chart it by itself.';
+      } else {
+        const missing = missingFor(per[0]);
+        unavailable.textContent = 'All conditions favorable can’t be charted here: no hour in this window has all six conditions reported'
+          + (missing.length ? ` (this station doesn’t report ${missing.join(', ')})` : '')
+          + '. Tap a condition below to chart it by itself.';
+      }
+      unavailable.classList.add('visible');
+    }
+
+    lastRun = p;
+    const maps = document.getElementById('contribMaps');
+    maps.classList.toggle('compare', compare);
+    maps.classList.toggle('stack', compare && p.grouping !== 'month'); // day columns are too wide to sit side by side
+    const targets = [
+      { table: document.getElementById('contribTable'), note: document.getElementById('contribNote'), head: document.getElementById('contribHead') },
+      { table: document.getElementById('contribTableB'), note: document.getElementById('contribNoteB'), head: document.getElementById('contribHeadB') }
+    ];
+    if (!compare) { targets[1].table.innerHTML = ''; targets[1].note.classList.remove('visible'); }
+    per.forEach((x, i) => {
+      targets[i].head.textContent = shorts[i] + (compare ? (i === 0 ? '  (lighter bars)' : '  (darker bars)') : '');
+      if (x.filtered.length > 0) renderContributors(targets[i], x.filtered, p.grouping, labels, x.counts, false, compare);
+      else renderContributors(targets[i], x.windowRows, p.grouping, labels, x.counts, true, compare);
+    });
+    document.getElementById('contribPanel').classList.add('visible');
+    renderTempChart(p, per.map(x => x.s), shorts);
+    return true;
+  }
+
+  // ---- Temperature & dew point chart (v0.17) ----
+  // One bar per airport per month (or day): mean temperature over the
+  // selected hours, colored by band; a tick across the bar marks the mean
+  // dew point. Left axis deg C, right axis deg F locked to the same scale.
+  const TEMP_HOT_C = 30;
+  const TEMP_COLORS = [
+    { cold: '#8fd3ff', mild: '#3fb87f', hot: '#d957c8', tick: '#ffffff' },  // airport 1
+    { cold: '#4a8fc4', mild: '#1d7a4f', hot: '#93368a', tick: '#c3c9d2' }   // airport 2 (darker)
+  ];
+  const cToF = c => c * 9 / 5 + 32;
+  const tempBand = c => (c < 0 ? 'cold' : c > TEMP_HOT_C ? 'hot' : 'mild');
+  const fmtC = c => (Math.round(c * 10) / 10).toFixed(1);
+  const fmtF = c => String(Math.round(cToF(c)));
+  const fmtCF = c => `${fmtC(c)}°C (${fmtF(c)}°F)`;
+
+  // Stats for one bucket of hours.
+  function tempBucketStats(rows) {
+    const temps = rows.map(r => r.tempC).filter(v => v !== null && v !== undefined);
+    const dews = rows.map(r => r.dewC).filter(v => v !== null && v !== undefined);
+    const das = rows.map(r => r.daFt).filter(v => v !== null && v !== undefined);
+    const out = { n: temps.length, dewN: dews.length, daN: das.length };
+    if (temps.length) {
+      out.t = spanStats(temps);
+      out.hotPct = temps.filter(v => v > TEMP_HOT_C).length / temps.length * 100;
+      out.coldPct = temps.filter(v => v < 0).length / temps.length * 100;
+    }
+    if (dews.length) out.dewMean = dews.reduce((a, b) => a + b, 0) / dews.length;
+    if (das.length) out.da = spanStats(das);
+    return out;
+  }
+
+  function tempTooltipLines(st, compact) {
+    if (!st || !st.n) return compact ? ['  no temperature reported'] : ['', 'No temperature reported for these hours'];
+    const pct = v => (v < 0.05 ? '0' : v.toFixed(1));
+    const daLine = st.daN >= SPAN_MIN_HOURS
+      ? null : (st.daN === 0 ? 'no station pressure reported' : 'too few hours with pressure');
+    if (compact) {
+      const out = [];
+      if (st.n >= SPAN_MIN_HOURS) out.push(`  +1σ ${fmtC(st.t.p84)} · med ${fmtC(st.t.median)} · −1σ ${fmtC(st.t.p16)} °C`);
+      out.push(`  >30°C: ${pct(st.hotPct)}% of hrs${st.coldPct >= 0.05 ? ` · <0°C: ${pct(st.coldPct)}%` : ''}`);
+      if (st.dewMean !== undefined) out.push(`  Dew pt ${fmtCF(st.dewMean)} · spread ${fmtC(st.t.mean - st.dewMean)}°C`);
+      out.push(daLine ? `  DA: ${daLine}` : `  DA mean ${fmtFt(st.da.mean)} · +1σ ${fmtFt(st.da.p84)} ft`);
+      return out;
+    }
+    const lines = ['', `Temperature, °C (°F) · ${st.n.toLocaleString()} hrs`];
+    if (st.n < SPAN_MIN_HOURS) lines.push('  too few hours for a span');
+    else {
+      const vals = [st.t.p84, st.t.mean, st.t.median, st.t.p16].map(fmtCF);
+      const w = Math.max(...vals.map(v => v.length));
+      const pad = v => v.padStart(w);
+      lines.push(`+1σ (84th) ${pad(vals[0])}`, `Mean       ${pad(vals[1])}`, `Median     ${pad(vals[2])}`, `−1σ (16th) ${pad(vals[3])}`);
+    }
+    lines.push(`Above 30°C: ${pct(st.hotPct)}% of hours`);
+    if (st.coldPct >= 0.05) lines.push(`Below 0°C:  ${pct(st.coldPct)}% of hours`);
+    if (st.dewMean !== undefined) lines.push('', `Dew point (mean) ${fmtCF(st.dewMean)}`, `Spread (temp − dew pt) ${fmtC(st.t.mean - st.dewMean)}°C`);
+    lines.push('', `Density altitude, ft${daLine ? '' : ` · ${st.daN.toLocaleString()} hrs`}`);
+    if (daLine) lines.push('  ' + daLine);
+    else {
+      const vals = [st.da.p84, st.da.mean, st.da.p16].map(fmtFt);
+      const w = Math.max(...vals.map(v => v.length));
+      lines.push(`+1σ (84th) ${vals[0].padStart(w)}`, `Mean       ${vals[1].padStart(w)}`, `−1σ (16th) ${vals[2].padStart(w)}`);
+    }
+    return lines;
+  }
+
+  // Draws the dew point tick across each bar.
+  const dewTickPlugin = {
+    id: 'dewTicks',
+    afterDatasetsDraw(chart) {
+      const series = chart.$tempSeries;
+      if (!series) return;
+      const { ctx } = chart;
+      const yScale = chart.scales.y;
+      ctx.save();
+      series.forEach((s, i) => {
+        const meta = chart.getDatasetMeta(i);
+        if (!meta || meta.hidden) return;
+        meta.data.forEach((bar, j) => {
+          const dew = s.dew[j];
+          if (dew === null || dew === undefined || s.data[j] === null) return;
+          const y = yScale.getPixelForValue(dew);
+          const half = bar.width / 2 + 2;
+          ctx.lineCap = 'butt';
+          ctx.strokeStyle = 'rgba(16,20,26,0.9)'; ctx.lineWidth = 5;
+          ctx.beginPath(); ctx.moveTo(bar.x - half, y); ctx.lineTo(bar.x + half, y); ctx.stroke();
+          ctx.strokeStyle = TEMP_COLORS[i].tick; ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.moveTo(bar.x - half + 1, y); ctx.lineTo(bar.x + half - 1, y); ctx.stroke();
+        });
+      });
+      ctx.restore();
+    }
+  };
+
+  function renderTempLegend(shorts, compare) {
+    const el = document.getElementById('tempLegend');
+    const sw = k => compare
+      ? `<span class="temp-sw pair" style="--a:${TEMP_COLORS[0][k]};--b:${TEMP_COLORS[1][k]}"></span>`
+      : `<span class="temp-sw" style="background:${TEMP_COLORS[0][k]}"></span>`;
+    let html = `<span>${sw('cold')}below 0 °C (32 °F)</span><span>${sw('mild')}0–30 °C (32–86 °F)</span><span>${sw('hot')}above 30 °C (86 °F)</span>`;
+    html += `<span><span class="temp-tick"></span>${compare ? '<span class="temp-tick b"></span>' : ''}dew point</span>`;
+    if (compare) html += `<span>${escapeHtml(shorts[0])} lighter · ${escapeHtml(shorts[1])} darker</span>`;
+    el.innerHTML = html;
+  }
+
+  function renderTempChart(p, slots, shorts) {
+    const panel = document.getElementById('tempPanel');
+    const frame = document.getElementById('tempChartFrame');
+    const empty = document.getElementById('tempEmpty');
+    if (tempChart) { tempChart.destroy(); tempChart = null; }
+    const compare = slots.length > 1;
+    const keyOf = bucketKeyOf(p);
+    const per = slots.map(s => {
+      const rows = filterRows(p, undefined, s.rows).filter(r => r.tempC !== null && r.tempC !== undefined);
+      const buckets = new Map();
+      rows.forEach(r => { const k = keyOf(r); if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(r); });
+      return { rows, buckets };
+    });
+    const labels = unionLabels(p, per.map(x => [...x.buckets.keys()]));
+    renderTempLegend(shorts, compare);
+    panel.classList.add('visible');
+    const noTemp = per.map((x, i) => (x.rows.length ? null : shorts[i])).filter(Boolean);
+    if (!labels.length) {
+      frame.classList.add('hidden');
+      empty.textContent = `No temperature reported in this date/time range${compare ? ' at either airport' : ' by this station'}.`;
+      empty.classList.add('visible');
+      return;
+    }
+    frame.classList.remove('hidden');
+    if (noTemp.length) { empty.textContent = `${noTemp.join(', ')}: no temperature reported in this date/time range.`; empty.classList.add('visible'); }
+    else empty.classList.remove('visible');
+
+    const series = per.map((x, i) => {
+      const stats = labels.map(k => (x.buckets.has(k) ? tempBucketStats(x.buckets.get(k)) : null));
+      return {
+        name: shorts[i], stats,
+        data: stats.map(st => (st && st.n ? Math.round(st.t.mean * 10) / 10 : null)),
+        dew: stats.map(st => (st && st.dewMean !== undefined ? Math.round(st.dewMean * 10) / 10 : null))
+      };
+    });
+    const vals = series.flatMap(s => s.data.concat(s.dew)).filter(v => v !== null);
+    const lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+    const yMin = lo >= 0 ? 0 : Math.floor((lo - 2) / 5) * 5;
+    const yMax = Math.max(5, Math.ceil((hi + 2) / 5) * 5);
+    const titleText = compare ? shorts.join(' vs ') : (p.names ? p.names[0] : shorts[0]);
+    const title = p.grouping === 'day-in-month'
+      ? `Mean temperature & dew point — ${titleText}, ${MONTH_NAMES[p.pickedMonth - 1]} days, ${p.startVal.slice(0,4)}-${p.endVal.slice(0,4)}, ${p.timeRangeLabel}`
+      : `Mean temperature & dew point — ${titleText}, ${p.startVal} to ${p.endVal}, ${p.timeRangeLabel}`;
+    const narrow = document.getElementById('tempChartFrame').clientWidth < 520;
+    const mono = { family: "'IBM Plex Mono', ui-monospace, monospace", size: narrow ? 9.5 : (compare ? 11 : 11.5) };
+    const tooltip = compare ? {
+      mode: 'index', intersect: false, bodyFont: mono,
+      callbacks: {
+        label: ctx => ` ${series[ctx.datasetIndex].name}: ${ctx.raw === null || ctx.raw === undefined ? 'no data' : fmtCF(ctx.raw) + ' mean'}`,
+        afterLabel: ctx => tempTooltipLines(series[ctx.datasetIndex].stats[ctx.dataIndex], true)
+      }
+    } : {
+      mode: 'index', intersect: false, bodyFont: mono,
+      callbacks: {
+        label: ctx => ` Mean temp ${fmtCF(ctx.raw)}`,
+        afterBody: items => (items.length ? tempTooltipLines(series[0].stats[items[0].dataIndex], false) : [])
+      }
+    };
+    tempChart = new Chart(document.getElementById('tempChart'), {
+      type: 'bar',
+      plugins: [dewTickPlugin],
+      data: {
+        labels,
+        datasets: series.map((s, i) => ({
+          label: s.name,
+          data: s.data,
+          backgroundColor: s.data.map(v => (v === null ? 'transparent' : TEMP_COLORS[i][tempBand(v)])),
+          borderRadius: 4,
+          maxBarThickness: 34
+        }))
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip,
+          title: { display: true, text: title, color: '#e7e4dc', font: { size: 12.5, weight: '500' }, padding: { bottom: 12 } }
+        },
+        scales: {
+          y: {
+            min: yMin, max: yMax,
+            title: { display: true, text: '°C', color: '#8b93a1' },
+            ticks: { color: '#8b93a1', stepSize: 5 },
+            grid: { color: c => (c.tick && c.tick.value === 0 ? '#5b6676' : '#2a323f'), lineWidth: c => (c.tick && c.tick.value === 0 ? 1.5 : 1) }
+          },
+          // Same scale in deg F: endpoints mapped from the left axis, so
+          // 32 °F always sits on 0 °C.
+          yF: {
+            position: 'right',
+            min: cToF(yMin), max: cToF(yMax),
+            title: { display: true, text: '°F', color: '#8b93a1' },
+            // Ticks placed explicitly on every 10 °F inside the range (v0.17 fix:
+            // letting Chart.js step from a non-round min, e.g. 23 °F, put
+            // every tick at 23, 33, 43… and none showed).
+            afterBuildTicks: axis => {
+              const t = [];
+              for (let v = Math.ceil(axis.min / 10) * 10; v <= axis.max + 1e-9; v += 10) t.push({ value: v });
+              axis.ticks = t;
+            },
+            ticks: { color: '#8b93a1', callback: v => Math.round(v) },
+            grid: { display: false }
+          },
+          x: {
+            ticks: { color: '#8b93a1', maxRotation: 60, minRotation: labels.length > 12 ? 60 : 0 },
+            grid: { display: false }
+          }
+        }
+      }
+    });
+    tempChart.$tempSeries = series;
+    tempChart.update('none');
+  }
+
+  // ---- Tap to dismiss chart tooltips (v0.17) ----
+  // On touch screens there is no mouse-out, so a tapped tooltip stayed up.
+  // Now: tapping the same bar again closes it, and a tap anywhere off the
+  // chart closes it. Mouse hover on desktop is unchanged.
+  function hideChartTip(c) {
+    if (!c || !c.tooltip || !c.tooltip.getActiveElements().length) return;
+    c.tooltip.setActiveElements([], { x: 0, y: 0 });
+    c.setActiveElements([]);
+    c.update('none');
+  }
+  ['resultChart', 'tempChart', 'condChart'].forEach(id => {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    let before = null;
+    canvas.addEventListener('pointerdown', e => {
+      const c = Chart.getChart(canvas);
+      const act = c && c.tooltip ? c.tooltip.getActiveElements() : [];
+      before = { touch: e.pointerType !== 'mouse', idx: act.length ? act[0].index : null };
+    }, true);
+    // After Chart.js has handled the same tap (its touchstart and click).
+    canvas.addEventListener('click', () => {
+      const b = before; before = null;
+      if (!b || !b.touch || b.idx === null) return;
+      setTimeout(() => {
+        const c = Chart.getChart(canvas);
+        const act = c && c.tooltip ? c.tooltip.getActiveElements() : [];
+        if (act.length && act[0].index === b.idx) hideChartTip(c);
+      }, 0);
+    });
+  });
+  document.addEventListener('pointerdown', e => {
+    [chartInstance, tempChart, condChart].forEach(c => { if (c && e.target !== c.canvas) hideChartTip(c); });
+  }, true);
+
+  runBtn.addEventListener('click', runAnalysis);
+
+  // ---- Per-condition pop-up (opened from a heat-map row) ----
+  const condModal = document.getElementById('condModal');
+  const condCanvas = document.getElementById('condChart');
+  const condChartWrap = document.getElementById('condChartWrap');
+  const condEmpty = document.getElementById('condEmpty');
+  let condChart = null;
+  let condIndex = 0;
+  let condReturnFocus = null;
+
+  function renderCond() {
+    const n = CONTRIB_ORDER.length;
+    const key = CONTRIB_ORDER[condIndex];
+    const m = METRIC_BY_KEY[key];
+    const p = lastRun;
+    document.getElementById('condTitle').textContent = m.label;
+    document.getElementById('condDesc').textContent = m.desc;
+    document.getElementById('condPos').textContent = `${condIndex + 1} / ${n}`;
+    document.getElementById('condPrevLabel').textContent = METRIC_BY_KEY[CONTRIB_ORDER[(condIndex - 1 + n) % n]].short;
+    document.getElementById('condNextLabel').textContent = METRIC_BY_KEY[CONTRIB_ORDER[(condIndex + 1) % n]].short;
+
+    if (condChart) { condChart.destroy(); condChart = null; }
+    const slots = (p && p.slots) ? p.slots : [];
+    const rowSets = slots.map(s => filterRows(p, key, s.rows));
+    const total = rowSets.reduce((n, r) => n + r.length, 0);
+    const range = p.grouping === 'day-in-month'
+      ? `${p.startVal.slice(0,4)}-${p.endVal.slice(0,4)}` : `${p.startVal} to ${p.endVal}`;
+    const obsText = p.compare
+      ? rowSets.map((r, i) => `${escapeHtml(p.shorts[i])}: ${r.length ? r.length.toLocaleString() + ' obs' : 'not reported'}`).join(' · ')
+      : `${rowSets[0].length.toLocaleString()} observations`;
+    document.getElementById('condMeta').innerHTML =
+      `<span class="mono">${escapeHtml(p.names.join(' vs '))}</span> · grouped by <span class="mono">${p.groupingLabel}</span> · ` +
+      `<span class="mono">${range}</span> · <span class="mono">${p.timeRangeLabel}</span> · ` +
+      `<span class="mono">${obsText}</span>` +
+      `<br>Hover or tap a bar for the ${SPAN_PARAM[key].name.replace(/,.*$/, '').toLowerCase()} span (+1σ / mean / median / −1σ).`;
+
+    if (total === 0) {
+      condChartWrap.style.display = 'none';
+      condEmpty.style.display = 'block';
+      condEmpty.textContent = 'No hours in this date/time window have usable data for this condition.';
+      return;
+    }
+    condEmpty.style.display = 'none';
+    condChartWrap.style.display = '';
+    const keyOf = bucketKeyOf(p);
+    const labels = unionLabels(p, rowSets.map(r => [...new Set(r.map(keyOf))]));
+    const series = slots.map((s, i) => ({
+      name: p.shorts[i],
+      data: rowSets[i].length ? pctAligned(rowSets[i], p, key, labels) : labels.map(() => null),
+      spans: spansByBucket(rowSets[i], p, key, labels, s.rows, p.compare)
+    }));
+    condChart = new Chart(condCanvas, buildChartConfig({ labels, series, metricLabel: m.chartLabel }));
+  }
+
+  function openCondModal(key) {
+    if (!lastRun) return;
+    const idx = CONTRIB_ORDER.indexOf(key);
+    if (idx === -1) return;
+    condIndex = idx;
+    condReturnFocus = document.activeElement;
+    condModal.classList.add('open');
+    condModal.setAttribute('aria-hidden', 'false');
+    document.documentElement.classList.add('modal-open');
+    renderCond();
+    document.getElementById('condClose').focus({ preventScroll: true });
+  }
+
+  function closeCondModal() {
+    if (!condModal.classList.contains('open')) return;
+    condModal.classList.remove('open');
+    condModal.setAttribute('aria-hidden', 'true');
+    document.documentElement.classList.remove('modal-open');
+    if (condChart) { condChart.destroy(); condChart = null; }
+    if (condReturnFocus && condReturnFocus.focus) condReturnFocus.focus({ preventScroll: true });
+  }
+
+  function stepCond(delta) {
+    const n = CONTRIB_ORDER.length;
+    condIndex = (condIndex + delta + n) % n;
+    renderCond();
+  }
+
+  // Rows in either heat map open the pop-up (it shows both airports).
+  const contribTableEl = document.getElementById('contribMaps');
+  contribTableEl.addEventListener('click', (e) => {
+    const row = e.target.closest('tr.contrib-row:not(.unavailable)');
+    if (row) openCondModal(row.dataset.metric);
+  });
+  contribTableEl.addEventListener('keydown', (e) => {
+    const row = e.target.closest('tr.contrib-row:not(.unavailable)');
+    if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openCondModal(row.dataset.metric); }
+  });
+
+  document.getElementById('condClose').addEventListener('click', closeCondModal);
+  document.getElementById('condPrev').addEventListener('click', () => stepCond(-1));
+  document.getElementById('condNext').addEventListener('click', () => stepCond(1));
+  condModal.addEventListener('click', (e) => { if (e.target === condModal) closeCondModal(); });
+  document.addEventListener('keydown', (e) => {
+    if (!condModal.classList.contains('open')) return;
+    if (e.key === 'Escape') { e.preventDefault(); closeCondModal(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); stepCond(-1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); stepCond(1); }
+  });
+
+  // Swipe left/right on the pop-up to step between conditions. Only a
+  // clearly horizontal swipe counts, so vertical scrolling still works.
+  let swipeX = null, swipeY = null;
+  const condDialog = condModal.querySelector('.cond-dialog');
+  condDialog.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { swipeX = null; return; }
+    swipeX = e.touches[0].clientX; swipeY = e.touches[0].clientY;
+  }, { passive: true });
+  condDialog.addEventListener('touchend', (e) => {
+    if (swipeX === null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - swipeX, dy = t.clientY - swipeY;
+    swipeX = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > 1.5 * Math.abs(dy)) stepCond(dx < 0 ? 1 : -1);
+  }, { passive: true });
+
+  window.addEventListener('resize', () => { if (condChart) condChart.resize(); });
+
+  // ---- Share Analysis Results (v0.16) ----
+  // The link carries what was fetched and how it was analysed:
+  //   a / b      airport 1 / 2 as entered (code part only)
+  //   av / bv    proxy airport picked from the chips (e.g. 0Q5 → KACV)
+  //   ax / bx    station typed in "Enter my own station"
+  //   aid / bid  a specific GHCNh station picked from the nearby list,
+  //   all / bll  with its lat,lon and
+  //   ac / bc    the airport code shown on that chip (legend "L52→KSBP")
+  //   from, to   date range (YYYY-MM-DD)   h  local hours, e.g. 10-16
+  //   g          month | day (days within a month), mo = month 1-12
+  // Opening such a link fills the form, then Fetch runs and the analysis
+  // runs itself. Prefs saved in this browser are not overwritten.
+  let sharedSlots = [];
+  function snapshotSlot(s) {
+    const code = s.input.value.split('—')[0].trim().toUpperCase();
+    const custom = s.customEl.value.trim().toUpperCase();
+    const snap = { a: code };
+    if (custom) snap.x = custom;
+    else if (s.selectedStationId) {
+      snap.id = s.selectedStationId;
+      if (s.selectedCoords) snap.ll = `${(+s.selectedCoords.lat).toFixed(4)},${(+s.selectedCoords.lon).toFixed(4)}`;
+      const chip = s.proxyChoice.querySelector('.proxy-chip.selected');
+      const c = s.viaCode || (chip ? (chip.textContent.match(/^([A-Z0-9]{3,4}) —/) || [])[1] : null);
+      if (c) snap.c = c;
+    } else if (s.selectedStation && s.selectedStation.toUpperCase() !== code) snap.v = s.selectedStation.toUpperCase();
+    if (!snap.a && snap.x) { snap.a = snap.x; delete snap.x; }
+    return snap;
+  }
+  const SHARE_BASE = 'https://weather-history-probability.netlify.app/';
+  function buildShareUrl() {
+    if (!lastRun || !sharedSlots.length) return null;
+    const q = new URLSearchParams();
+    sharedSlots.forEach((snap, i) => {
+      const k = i === 0 ? 'a' : 'b';
+      q.set(k, snap.a);
+      if (snap.v) q.set(k + 'v', snap.v);
+      if (snap.x) q.set(k + 'x', snap.x);
+      if (snap.id) q.set(k + 'id', snap.id);
+      if (snap.ll) q.set(k + 'll', snap.ll);
+      if (snap.c) q.set(k + 'c', snap.c);
+    });
+    q.set('from', lastRun.startVal);
+    q.set('to', lastRun.endVal);
+    q.set('h', `${lastRun.hourStart}-${lastRun.hourEnd}`);
+    q.set('g', lastRun.grouping === 'day-in-month' ? 'day' : 'month');
+    if (lastRun.grouping === 'day-in-month') q.set('mo', String(lastRun.pickedMonth));
+    return SHARE_BASE + '?' + q.toString();
+  }
+  const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const fmtShareDate = v => { const [y, m, d] = v.split('-'); return `${d}-${MON3[+m - 1]}-${y}`; };
+  function shareSummary() {
+    const names = sharedSlots.map(x => x.a).join(' vs ');
+    const by = lastRun.grouping === 'day-in-month' ? `days in ${MONTH_NAMES[lastRun.pickedMonth - 1]}` : 'month';
+    return `${names}: odds of favorable flying conditions, ${fmtShareDate(lastRun.startVal)} to ${fmtShareDate(lastRun.endVal)}, ${lastRun.timeRangeLabel} local, by ${by}.`;
+  }
+  (() => {
+    const btn = document.getElementById('shareResultsBtn');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const url = buildShareUrl();
+      if (!url) return;
+      const label = btn.querySelector('span') || btn;
+      const original = label.textContent;
+      const title = `Weather History and Probability — ${sharedSlots.map(x => x.a).join(' vs ')}`;
+      const text = shareSummary();
+      if (navigator.share){
+        try { await navigator.share({ title, text, url }); return; }
+        catch (err) { if (err && err.name === 'AbortError') return; /* else fall through */ }
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        label.textContent = 'Link copied to clipboard!';
+        setTimeout(() => { label.textContent = original; }, 2200);
+      } catch (err) {
+        window.location.href = 'mailto:?subject=' + encodeURIComponent(title)
+          + '&body=' + encodeURIComponent(text + '\n\n' + url);
+      }
+    });
+  })();
+
+  // Opening a shared link: fill the form, then Fetch (which runs the analysis).
+  (async () => {
+    const q = new URLSearchParams(location.search);
+    const codeOk = v => /^[A-Za-z0-9-]{2,20}$/.test(v || '');
+    if (!codeOk(q.get('a'))) return;
+    await airportsReady;
+    const fill = (s, k) => {
+      const code = (q.get(k) || '').toUpperCase();
+      if (!codeOk(code)) return false;
+      const ap = AIRPORTS.find(x => x.code === code);
+      s.input.value = ap ? `${ap.code} — ${ap.name}` : code;
+      s.clearBtn.classList.add('visible');
+      const v = (q.get(k + 'v') || '').toUpperCase();
+      const x = (q.get(k + 'x') || '').toUpperCase();
+      const id = q.get(k + 'id') || '';
+      const c = (q.get(k + 'c') || '').toUpperCase();
+      const ll = (q.get(k + 'll') || '').split(',').map(Number);
+      if (codeOk(x)) s.customEl.value = x;
+      else if (codeOk(id)) {
+        s.selectedStationId = id;
+        s.selectedStation = id;
+        if (ll.length === 2 && ll.every(Number.isFinite)) s.selectedCoords = { lat: ll[0], lon: ll[1] };
+        if (/^[A-Z0-9]{3,4}$/.test(c)) s.viaCode = c;
+      } else if (codeOk(v)) {
+        // same state a proxy-airport chip leaves behind
+        const pa = AIRPORTS.find(x2 => x2.code === v);
+        s.selectedStation = v;
+        s.selectedCoords = pa ? { lat: pa.lat, lon: pa.lon } : null;
+      } else if (ap && ap.hasHistory) {
+        s.selectedStation = ap.code;
+        s.selectedCoords = { lat: ap.lat, lon: ap.lon };
+      }
+      return true;
+    };
+    fill(slotA, 'a');
+    const hasB = fill(slotB, 'b');
+    const isDate = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
+    if (isDate(q.get('from'))) document.getElementById('startDate').value = q.get('from');
+    if (isDate(q.get('to'))) document.getElementById('endDate').value = q.get('to');
+    const hm = /^(\d{1,2})-(\d{1,2})$/.exec(q.get('h') || '');
+    if (hm && +hm[1] <= 23 && +hm[2] <= 23) {
+      startSel.value = String(+hm[1]).padStart(2, '0') + ':00';
+      enforceHourOrder();
+      endSel.value = String(Math.max(+hm[1], +hm[2])).padStart(2, '0') + ':00';
+    }
+    const day = q.get('g') === 'day';
+    const mo = parseInt(q.get('mo'), 10);
+    document.querySelectorAll('input[name="grouping"]').forEach(r => {
+      r.checked = r.value === (day ? 'day-in-month' : 'month');
+      r.closest('.radio-option').classList.toggle('checked', r.checked);
+    });
+    document.getElementById('monthPickerWrap').classList.toggle('visible', day);
+    if (day && mo >= 1 && mo <= 12) document.getElementById('monthPicker').value = String(mo);
+
+    const names = [q.get('a'), hasB ? q.get('b') : null].filter(Boolean).map(x => escapeHtml(x.toUpperCase())).join(' vs ');
+    const banner = document.getElementById('sharedBanner');
+    banner.innerHTML = `<strong>Shared analysis: ${names}.</strong> Fetching NOAA data and running it now…`;
+    banner.classList.add('visible');
+    updateFetchButtonState();
+    fetchNoaaBtn.click();
+    // Fetch's handler is async; wait for it to finish, then settle the banner.
+    await new Promise(r => setTimeout(r, 50));
+    await new Promise(r => { const t = setInterval(() => { if (!fetchNoaaBtn.disabled) { clearInterval(t); r(); } }, 250); });
+    if (!banner.classList.contains('visible')) return; // user already moved on
+    banner.innerHTML = lastRun
+      ? `<strong>Shared analysis: ${names}.</strong> Results below. Change anything and Fetch again to make it your own.`
+      : `<strong>Shared analysis: ${names}.</strong> Couldn't load it automatically — see the message below.`;
+  })();
+
+  // ---- share button (App-Conventions §6a) ----
+  (() => {
+    const APP_URL   = 'https://weather-history-probability.netlify.app/';
+    const APP_TITLE = 'Weather History and Probability';
+    const APP_TEXT  = 'Historical NOAA weather and odds of favorable flying conditions at a GA airport, by date range.';
+    const btn = document.getElementById('shareBtn');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const label = btn.querySelector('span') || btn;
+      const original = label.textContent;
+      if (navigator.share){
+        try { await navigator.share({ title: APP_TITLE, text: APP_TEXT, url: APP_URL }); return; }
+        catch (err) { if (err && err.name === 'AbortError') return; /* else fall through */ }
+      }
+      try {
+        await navigator.clipboard.writeText(APP_URL);
+        label.textContent = 'Link copied to clipboard!';
+        setTimeout(() => { label.textContent = original; }, 2200);
+      } catch (err) {
+        window.location.href = 'mailto:?subject=' + encodeURIComponent(APP_TITLE)
+          + '&body=' + encodeURIComponent(APP_TEXT + ' ' + APP_URL);
+      }
+    });
+  })();
+
+  // ---- open counter (our own Netlify Blobs-backed function) ----
+  fetch('/.netlify/functions/hit-counter')
+    .then(r => r.json())
+    .then(data => {
+      const hitCounterEl = document.getElementById('hitCounter');
+      if (hitCounterEl && data && typeof data.count === 'number') {
+        hitCounterEl.textContent = `Opened ${data.count} times`;
+      }
+      if (data && data.error) console.warn('hit-counter error:', data.error);
+      if (data && data.note) console.warn('hit-counter note:', data.note);
+    })
+    .catch(() => { /* fail silently if the counter function is unavailable */ });
+</script>
+
+</body>
+</html>
