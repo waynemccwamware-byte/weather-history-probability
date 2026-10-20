@@ -577,6 +577,22 @@
   .compare-block{ margin-top:14px; }
   .compare-head{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
   .compare-head label.small{ font-size:10.5px; color:var(--text-muted); letter-spacing:0.04em; }
+
+  /* v0.18: Airport box (step 1) tightened -- less card padding, shorter inputs, smaller gaps.
+     Font sizes unchanged (inputs stay 16px so iPhone doesn't zoom on focus). */
+  .step.step-airport{ padding:14px 18px; }
+  .step-airport .step-body p.hint{ margin-bottom:8px; }
+  .step-airport .compare-head{ margin-bottom:3px; }
+  .step-airport .airport-search input[type="text"]{ padding-top:6px; padding-bottom:6px; }
+  .step-airport .compare-block{ margin-top:8px; }
+  .step-airport .date-range{ margin-top:10px; }
+  .step-airport .date-range-label,
+  .step-airport .date-field label.small{ margin-bottom:3px; }
+  .step-airport .date-range-fields{ gap:10px; }
+  .step-airport .date-field input[type="date"]{ padding-top:5px; padding-bottom:5px; }
+  .step-airport .date-arrow{ margin-top:12px; }
+  .step-airport .date-range-note{ margin-top:5px; }
+  .step-airport .csv-upload{ margin-top:8px; }
   .compare-shade-note{ letter-spacing:0; text-transform:none; }
   .contrib-maps{ display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap:14px; }
   .contrib-maps.stack{ grid-template-columns:minmax(0, 1fr); }
@@ -752,7 +768,7 @@
 <div class="rig">
   <div class="title-row">
     <h1>Weather History and Probability</h1>
-    <span class="ver mono">v0.17</span>
+    <span class="ver mono">v0.18</span>
   </div>
 
   <div class="purpose-line"><span class="purpose-label">Purpose of this app:</span>&nbsp; pull historical NOAA weather for any US, Mexican or Canadian airport and estimate the odds of favorable flying conditions — low cloud layer, VFR, fog, or convection — for a chosen date range and time window</div>
@@ -764,7 +780,7 @@
   <div class="panel">
 
     <!-- Step 1: Airport -->
-    <div class="step">
+    <div class="step step-airport">
       <div class="step-body">
         <h2>Airport</h2>
         <p class="hint">Search by ICAO identifier, airport name or city. If the station has no usable weather history, we'll suggest a nearby station with a comparable microclimate.</p>
