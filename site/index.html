@@ -723,7 +723,7 @@
   html.modal-open, html.modal-open body{ overflow:hidden; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<!-- GGP-FOOTER-CSS START v1.3 · 29-Oct-2026 · shared footer styles, App Conventions §5b · master: Control Panel repo tools/ggp-footer -->
+<!-- GGP-FOOTER-CSS START v1.4 · 02-Nov-2026 · shared footer styles, App Conventions §5b · master: Control Panel repo tools/ggp-footer -->
 <style>
 .ggp-footer{
   --ggp-amber:#f5a623; --ggp-muted:#8b93a1; --ggp-bezel:#2a323f; --ggp-bezel-hi:#3a4454;
@@ -747,6 +747,8 @@
 .ggp-footer .ggp-extra a:hover, .ggp-footer .ggp-credit a:hover{ color:var(--ggp-amber); border-bottom-color:var(--ggp-amber); }
 .ggp-footer .ggp-count{ margin-top:6px; }
 .ggp-footer .ggp-count:empty{ display:none; }
+.ggp-footer .ggp-count a{ color:inherit; text-decoration:none; border-bottom:1px dotted var(--ggp-bezel-hi); padding-bottom:1px; }
+.ggp-footer .ggp-count a:hover{ color:var(--ggp-amber); border-bottom-color:var(--ggp-amber); }
 .ggp-footer .ggp-actions{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:12px; }
 .ggp-footer .ggp-pill{
   display:inline-flex; align-items:center; gap:7px; margin:0; padding:8px 16px;
@@ -977,7 +979,7 @@
 
   <div class="disclaimer"><span class="disclaimer-label">Disclaimer:</span> <span class="disclaimer-quote">&ldquo;There are three kinds of lies: lies, damned lies, and statistics.&rdquo;</span> &mdash; Mark Twain</div>
 
-  <!-- GGP-FOOTER START v1.3 · 29-Oct-2026 · shared footer, App Conventions §5a · master: Control Panel repo tools/ggp-footer -->
+  <!-- GGP-FOOTER START v1.4 · 02-Nov-2026 · shared footer, App Conventions §5a · master: Control Panel repo tools/ggp-footer -->
 <footer class="ggp-footer">
   <div class="ggp-back"><a href="https://geezer-geek-pilot-control-panel.netlify.app/">&larr; Back to GeezerGeek Pilot Apps</a></div>
   <div class="ggp-credit">Wayne McClelland (<a href="https://geezer-geek-pilot-control-panel.netlify.app/airports/" target="_blank" rel="noopener">airports visited</a>), <a href="https://youtube.com/@GeezerGeekPilot" target="_blank" rel="noopener">GeezerGeek Pilot</a>, <a href="https://docs.google.com/document/d/1chfDa3JBCjsGykGjwrAFwOqMAS7d3_dIY9ieROLCIyU/preview" target="_blank" rel="noopener">Reference Materials</a></div>
@@ -2899,7 +2901,7 @@
     .catch(() => { /* fail silently if the counter function is unavailable */ });
 </script>
 
-<!-- GGP-FOOTER-JS START v1.3 · 29-Oct-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
+<!-- GGP-FOOTER-JS START v1.4 · 02-Nov-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
 <script>
 (() => {
   if (window.__ggpFooter) return;
@@ -2942,7 +2944,14 @@
       .then(d => {
         const base = parseInt(countEl.dataset.base, 10) || 0;  // pre-Tally opens, App Conventions §6b
         const n = d && typeof d.visit === 'number' ? d.visit + base : null;
-        if (typeof n === 'number') countEl.textContent = 'Opened ' + n.toLocaleString() + (n === 1 ? ' time' : ' times');
+        if (typeof n !== 'number') return;
+        const text = 'Opened ' + n.toLocaleString() + (n === 1 ? ' time' : ' times');
+        const href = countEl.dataset.href;   // v1.4: the count links to the open-counts page
+        if (href) {
+          const a = document.createElement('a');
+          a.href = href; a.textContent = text; a.title = 'Open counts for every app';
+          countEl.replaceChildren(a);
+        } else countEl.textContent = text;
       })
       .catch(() => { /* counter is a nice-to-have, never block the app */ });
   }

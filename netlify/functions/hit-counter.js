@@ -70,6 +70,14 @@ exports.handler = async (event) => {
     const current = await blobsRequest('get', auth, KEY);
     let count = current !== null ? parseInt(current, 10) : 0;
     if (isNaN(count)) count = 0;
+
+    // ?mode=read returns the count without adding to it (Control Panel /stats/ page, 02-Nov-2026;
+    // same parameter name as Tally's read-only mode).
+    const params = event.queryStringParameters || {};
+    if (params.mode === 'read') {
+      return { statusCode: 200, headers, body: JSON.stringify({ count }) };
+    }
+
     count += 1;
 
     await blobsRequest('put', auth, KEY, String(count));
