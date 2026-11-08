@@ -772,7 +772,7 @@
 <div class="rig">
   <div class="title-row">
     <h1>Weather History and Probability</h1>
-    <span class="ver mono">v0.19</span>
+    <span class="ver mono">v0.20</span>
   </div>
 
   <div class="purpose-line"><span class="purpose-label">Purpose of this app:</span>&nbsp; pull historical NOAA weather for any US, Mexican or Canadian airport and estimate the odds of favorable flying conditions — low cloud layer, VFR, fog, or convection — for a chosen date range and time window</div>
@@ -1019,7 +1019,7 @@
   // single conditions are reached by tapping their heat-map row.
   const METRICS = [
     { key: 'combined', label: 'All conditions favorable',
-      desc: 'All six conditions favorable in the same hour — an hour with any condition unreported is left out, so the sample is smaller than for any single condition',
+      desc: 'All six conditions favorable in the same hour — an hour with a condition unreported is left out unless another condition already makes it unfavorable, so the sample can be smaller than for any single condition',
       chartLabel: '% Probability All Conditions Favorable' },
     { key: 'marine', label: 'Absence of low cloud layer', short: 'Low cloud', heatLabel: 'Low cloud layer',
       desc: 'Sky condition = CLR/SCT/FEW (no BKN/OVC/obscured layer) — or ceiling ≥ 4000 ft AGL',
@@ -1819,20 +1819,24 @@
     if (metric === 'wind') return r.windFavorable;
 
     // Composite: every one of the six individual metrics must be
-    // favorable for this hour. Null-propagating -- if any component metric
-    // can't be determined (e.g. missing wind_speed, or a ceiling exists
-    // but its height wasn't reported), the whole hour is excluded rather
-    // than guessed at, so this metric's usable sample size will often be
-    // smaller than any single metric's own.
+    // favorable for this hour. Three-valued AND (v0.20): one known
+    // unfavorable condition makes the hour unfavorable even if another
+    // condition is unknown; the hour is excluded (null) only when nothing
+    // is known to be unfavorable and at least one condition can't be
+    // determined. Before v0.20 any unknown excluded the hour, which threw
+    // out cloudy hours at stations that report a BKN/OVC layer without its
+    // height (VFR unknown, low cloud already unfavorable) and left mostly
+    // good-weather hours behind -- e.g. KEKA Aug 10:00-14:00, 2021-25:
+    // 82.4% on 68 hours before, 31.1% on 180 hours after.
     if (metric === 'combined') {
       const components = ['marine', 'vfr', 'fog', 'convective', 'precip', 'wind'];
-      let allFavorable = true;
+      let anyUnknown = false;
       for (const m of components) {
         const sub = computeFavorable(r, m);
-        if (sub === null) return null;
-        if (!sub) allFavorable = false;
+        if (sub === false) return false;
+        if (sub === null) anyUnknown = true;
       }
-      return allFavorable;
+      return anyUnknown ? null : true;
     }
 
     return null;
