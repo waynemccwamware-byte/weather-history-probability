@@ -35,6 +35,15 @@ h1 span{color:var(--text-muted);font-weight:400}
 .panel{color:var(--text-muted);font-size:14px}
 .fname{margin-left:auto;font:500 14px "IBM Plex Mono",monospace;color:var(--text-primary);background:var(--bg-deep);border:1px solid var(--bezel);border-radius:6px;padding:3px 8px}
 #script{font-size:clamp(22px,3.2vw,30px);line-height:1.4;margin:6px 0 16px;min-height:4.2em}
+#script[contenteditable="true"],#script[contenteditable="plaintext-only"]{outline:none;border-radius:8px;padding:4px 6px;margin-left:-6px;margin-right:-6px;cursor:text}
+#script[contenteditable]:hover{background:rgba(255,255,255,.03)}
+#script[contenteditable]:focus{background:var(--bg-deep);box-shadow:0 0 0 2px var(--amber-dim)}
+.edited{font:600 11px "IBM Plex Mono",monospace;letter-spacing:.1em;padding:3px 8px;border-radius:999px;border:1.5px solid var(--teal);color:var(--teal)}
+.linkbtn{background:none;border:none;min-height:0;padding:0;font:500 13px "IBM Plex Sans",sans-serif;color:var(--text-muted);text-decoration:underline;cursor:pointer}
+.linkbtn:hover{background:none;color:var(--text-primary)}
+.edithint{font-size:13px;color:var(--text-muted);margin:-8px 0 12px}
+#dlscript{width:100%;margin-top:12px;font-size:14px;min-height:40px;padding:8px 12px}
+#list .ed{color:var(--teal);font-size:11px;margin-left:auto}
 #script.bubble{border:1.5px solid var(--amber);border-radius:18px;padding:12px 16px;font-size:clamp(20px,2.8vw,26px)}
 .stage{position:relative;height:150px;background:var(--bg-deep);border:1px solid var(--bezel);border-radius:10px;overflow:hidden;display:grid;place-items:center}
 .stage canvas{position:absolute;inset:0;width:100%;height:100%}
@@ -84,9 +93,12 @@ aside h2{font:600 12px "IBM Plex Mono",monospace;letter-spacing:.1em;color:var(-
     <div class="meta">
       <span class="kind" id="kind">NARRATION</span>
       <span class="panel" id="panel"></span>
+      <span class="edited" id="edited" hidden>EDITED</span>
+      <button class="linkbtn" id="revert" hidden>revert</button>
       <span class="fname" id="fname"></span>
     </div>
-    <div id="script"></div>
+    <div id="script" spellcheck="true"></div>
+    <div class="edithint" id="edithint">Click the text to edit it before you record. Changes are kept on this device and sent along with the take.</div>
     <div class="stage" id="stage">
       <canvas id="cv"></canvas>
       <div id="playhead"></div>
@@ -106,10 +118,11 @@ aside h2{font:600 12px "IBM Plex Mono",monospace;letter-spacing:.1em;color:var(-
   <aside class="card">
     <h2>Lines</h2>
     <ul id="list"></ul>
-    <div class="legend"><b style="color:var(--amber)">✓</b> saved on this device &nbsp; <b style="color:var(--teal)">●</b> already received</div>
+    <div class="legend"><b style="color:var(--amber)">✓</b> saved on this device &nbsp; <b style="color:var(--teal)">●</b> already received &nbsp; <b style="color:var(--teal)">edited</b> script changed</div>
+    <button id="dlscript">⇩ Script with my edits (.txt)</button>
   </aside>
 
-  <p class="tips">Saved files go to your Downloads folder (on iPhone, pick “Save to Files” or AirDrop). Attach them in the Claude chat and they go straight into the video.</p>
+  <p class="tips">Saved files go to your Downloads folder (on iPhone, pick “Save to Files” or AirDrop). When you've edited a line, its saved take comes with a matching .txt of the words you read (for example s4-b.txt). Attach the audio and any .txt files in the Claude chat, or use “Script with my edits” to send every line at once.</p>
 </div>
 
 <script>
@@ -118,6 +131,13 @@ const $ = id => document.getElementById(id);
 const SKEY = 'whp.rec.saved';
 let saved = {}; try { saved = JSON.parse(localStorage.getItem(SKEY) || '{}'); } catch (e) {}
 const keep = () => { try { localStorage.setItem(SKEY, JSON.stringify(saved)); } catch (e) {} };
+// Script edits made on this page (by line name). Kept on this device; sent as .txt with the take.
+const EKEY = 'whp.rec.edits';
+let edits = {}; try { edits = JSON.parse(localStorage.getItem(EKEY) || '{}'); } catch (e) {}
+const keepEdits = () => { try { localStorage.setItem(EKEY, JSON.stringify(edits)); } catch (e) {} };
+const textOf = l => (edits[l.name] != null ? edits[l.name] : l.text);
+const isEdited = l => edits[l.name] != null && edits[l.name] !== l.text;
+const EDITABLE = (() => { const d = document.createElement('div'); d.contentEditable = 'plaintext-only'; return d.contentEditable === 'plaintext-only' ? 'plaintext-only' : 'true'; })();
 
 let idx = 0, state = 'idle';           // idle | count | rec | review
 let stream = null, micSrc = null, revBuf = null, revSrc = null, actx = null, analyser = null, rec = null, chunks = [], blob = null, blobUrl = null, peaks = null;
@@ -133,7 +153,7 @@ function renderList() {
   LINES.forEach((l, i) => {
     const li = document.createElement('li');
     li.className = (i === idx ? 'cur ' : '') + (saved[l.name] ? 'saved' : l.live ? 'live' : '');
-    li.innerHTML = `<span class="dot">${saved[l.name] ? '✓' : l.live ? '●' : '○'}</span><code>${l.name}</code><small>${l.kind === 'bubble' ? 'bubble' : ''}</small>`;
+    li.innerHTML = `<span class="dot">${saved[l.name] ? '✓' : l.live ? '●' : '○'}</span><code>${l.name}</code>${isEdited(l) ? '<span class="ed">edited</span>' : '<small></small>'}`;
     li.onclick = () => go(i);
     ul.appendChild(li);
     if (i === idx) li.scrollIntoView({ block: 'nearest' });
@@ -147,7 +167,8 @@ function renderLine() {
   $('kind').className = 'kind' + (l.kind === 'bubble' ? ' bubble' : '');
   $('panel').textContent = l.panel;
   $('fname').textContent = fileName();
-  $('script').textContent = l.text;
+  $('script').textContent = textOf(l);
+  $('edited').hidden = $('revert').hidden = !isEdited(l);
   $('script').className = l.kind === 'bubble' ? 'bubble' : '';
 }
 function setState(s) {
@@ -157,6 +178,9 @@ function setState(s) {
   $('count').hidden = s !== 'count'; $('recbadge').hidden = s !== 'rec';
   $('hint').hidden = !(s === 'idle'); $('playhead').style.display = s === 'review' ? 'block' : 'none';
   $('prev').disabled = $('next').disabled = (s === 'count' || s === 'rec');
+  const canEdit = s === 'idle' || s === 'review';
+  if (canEdit) $('script').setAttribute('contenteditable', EDITABLE); else { $('script').removeAttribute('contenteditable'); $('script').blur(); }
+  $('edithint').hidden = !canEdit;
   if (s === 'idle') {
     clearCanvas();
     $('hint').textContent = saved[LINES[idx].name] ? 'Saved already. Record again to replace.' : 'Press Record. A 3-second countdown, then speak.';
@@ -324,28 +348,56 @@ async function save() {
   player.pause(); stopReview();
   const name = fileName();
   const file = new File([blob], name, { type: blob.type });
+  const L0 = LINES[idx], txtName = L0.name + '.txt';
+  const txt = isEdited(L0) ? new File([`${L0.name} (${L0.panel}) — edited before recording\n\n${textOf(L0)}\n`], txtName, { type: 'text/plain' }) : null;
   const touch = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
   let ok = false;
-  if (touch && navigator.canShare && navigator.canShare({ files: [file] })) {
-    try { await navigator.share({ files: [file], title: name }); ok = true; }
+  const files = txt ? [file, txt] : [file];
+  if (touch && navigator.canShare && navigator.canShare({ files })) {
+    try { await navigator.share({ files, title: name }); ok = true; }
     catch (e) { if (e.name === 'AbortError') { msg('Not saved. Tap OK again when ready.'); return; } }
   }
   if (!ok) {
     const a = document.createElement('a'); a.href = blobUrl; a.download = name;
     document.body.appendChild(a); a.click(); a.remove(); ok = true;
+    if (txt) setTimeout(() => downloadFile(txt), 400);
   }
   saved[LINES[idx].name] = Date.now(); keep();
+  if (txt) msg(`Saved ${name} and ${txtName} (your edited words).`);
   const nextI = LINES.findIndex((l, i) => i > idx && !saved[l.name]);
   const done = LINES[idx].name;
   setTimeout(() => {
-    if (nextI >= 0) { go(nextI); msg(`Saved ${name}. Next up: ${LINES[nextI].name}.`); }
+    if (nextI >= 0) { go(nextI); msg(`Saved ${name}${txt ? ' + ' + txtName : ''}. Next up: ${LINES[nextI].name}.`); }
     else { renderList(); setState('idle'); msg(`Saved ${name}. That’s every line after ${done}.`); }
   }, 600);
 }
 
+// ---------- script editing ----------
+function downloadFile(f) { const u = URL.createObjectURL(f), a = document.createElement('a'); a.href = u; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 2000); }
+function commitEdit() {
+  const l = LINES[idx], t = $('script').innerText.replace(/\s+/g, ' ').trim();
+  if (!t || t === l.text) delete edits[l.name]; else edits[l.name] = t;
+  keepEdits(); $('script').textContent = textOf(l);
+  $('edited').hidden = $('revert').hidden = !isEdited(l); renderList();
+}
+$('script').addEventListener('blur', () => { if ($('script').hasAttribute('contenteditable')) commitEdit(); });
+$('script').addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); if (e.key === 'Escape') $('script').textContent = textOf(LINES[idx]); $('script').blur(); }
+  e.stopPropagation();   // typing here never triggers record/play shortcuts
+});
+$('script').addEventListener('paste', e => { e.preventDefault(); const t = (e.clipboardData || window.clipboardData).getData('text/plain'); document.execCommand('insertText', false, t.replace(/\s+/g, ' ')); });
+$('revert').onclick = () => { delete edits[LINES[idx].name]; keepEdits(); renderLine(); renderList(); msg('Back to the original script for this line.'); };
+$('dlscript').onclick = () => {
+  const out = LINES.map(l => `${l.name}${isEdited(l) ? '   [EDITED]' : ''}   (${l.panel})\n${textOf(l)}\n`).join('\n');
+  const n = LINES.filter(isEdited).length;
+  downloadFile(new File([`Weather History and Probability — VO script as recorded (${n} line${n === 1 ? '' : 's'} edited)\n\n` + out], 'vo-script-edited.txt', { type: 'text/plain' }));
+  msg(`Downloaded vo-script-edited.txt (${n} edited line${n === 1 ? '' : 's'}).`);
+};
+
 // ---------- keys ----------
 document.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (document.activeElement === $('script')) return;
   const k = e.key;
   if ((k === ' ' || k === 'Enter') && document.activeElement && document.activeElement.tagName === 'BUTTON') document.activeElement.blur();
   if (k === ' ') { e.preventDefault(); if (state === 'rec') stopRec(); else if (state === 'idle' || state === 'review') startCount(); }
