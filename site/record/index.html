@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Weather Video VO Recorder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-deep:#10141a; --bg-panel:#1b222c; --bezel:#2a323f; --bezel-hi:#3a4454;
+  --amber:#f5a623; --amber-dim:#7a5a1e; --amber-glow:rgba(245,166,35,0.35);
+  --text-primary:#e7e4dc; --text-muted:#8b93a1; --teal:#3fa7a0; --focus:#f5a623; --alert:#e0705f;
+  --rec:#e0473a;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+@media (hover:none){.nav span{display:none}}
+html{background:var(--bg-deep);color-scheme:dark}
+body{margin:0;background:var(--bg-deep);color:var(--text-primary);font:16px/1.45 "IBM Plex Sans",system-ui,sans-serif;
+  padding:env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom))}
+.wrap{max-width:1040px;margin:0 auto;display:grid;grid-template-columns:1fr 290px;gap:18px;padding-top:16px}
+@media (max-width:820px){.wrap{grid-template-columns:1fr}}
+header{grid-column:1/-1;display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font:600 18px "IBM Plex Mono",monospace;letter-spacing:.06em;text-transform:uppercase;margin:0;color:var(--amber)}
+h1 span{color:var(--text-muted);font-weight:400}
+#tally{font:500 14px "IBM Plex Mono",monospace;color:var(--text-muted)}
+#tally b{color:var(--text-primary)}
+.card{background:var(--bg-panel);border:1px solid var(--bezel);border-radius:14px;padding:18px}
+.meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.kind{font:600 11px "IBM Plex Mono",monospace;letter-spacing:.1em;padding:3px 8px;border-radius:999px;border:1.5px solid var(--amber);color:var(--amber)}
+.kind.bubble{border-style:dashed}
+.panel{color:var(--text-muted);font-size:14px}
+.fname{margin-left:auto;font:500 14px "IBM Plex Mono",monospace;color:var(--text-primary);background:var(--bg-deep);border:1px solid var(--bezel);border-radius:6px;padding:3px 8px}
+#script{font-size:clamp(22px,3.2vw,30px);line-height:1.4;margin:6px 0 16px;min-height:4.2em}
+#script.bubble{border:1.5px solid var(--amber);border-radius:18px;padding:12px 16px;font-size:clamp(20px,2.8vw,26px)}
+.stage{position:relative;height:150px;background:var(--bg-deep);border:1px solid var(--bezel);border-radius:10px;overflow:hidden;display:grid;place-items:center}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%}
+#count{font:600 92px "IBM Plex Mono",monospace;color:var(--amber);text-shadow:0 0 30px var(--amber-glow);position:relative}
+#hint{color:var(--text-muted);font-size:15px;position:relative;text-align:center;padding:0 12px}
+#recbadge{position:absolute;top:10px;left:12px;font:600 14px "IBM Plex Mono",monospace;color:var(--rec);display:flex;align-items:center;gap:8px}
+#recbadge i{width:12px;height:12px;border-radius:50%;background:var(--rec);animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.2}}
+#playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--amber);left:0;display:none}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+button{font:600 16px "IBM Plex Sans",sans-serif;color:var(--text-primary);background:var(--bezel);border:1px solid var(--bezel-hi);border-radius:10px;padding:12px 18px;cursor:pointer;min-height:48px}
+button:hover{background:var(--bezel-hi)}
+button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+button.primary{background:var(--amber);border-color:var(--amber);color:#1a1205}
+button.primary:hover{filter:brightness(1.08)}
+button.rec{background:var(--rec);border-color:var(--rec);color:#fff}
+button.ok{margin-left:auto}
+button kbd{font:500 11px "IBM Plex Mono",monospace;opacity:.65;margin-left:6px}
+.nav{display:flex;gap:8px;margin-top:14px;align-items:center}
+.nav button{padding:8px 14px;min-height:40px;font-size:14px}
+.nav span{color:var(--text-muted);font-size:13px;margin-left:auto}
+#msg{min-height:1.4em;margin-top:10px;font-size:14px;color:var(--teal)}
+#msg.err{color:var(--alert)}
+aside h2{font:600 12px "IBM Plex Mono",monospace;letter-spacing:.1em;color:var(--text-muted);text-transform:uppercase;margin:4px 0 8px}
+#list{list-style:none;margin:0;padding:0;max-height:70vh;overflow:auto}
+#list li{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:14px}
+#list li:hover{background:var(--bezel)}
+#list li.cur{background:var(--bezel);outline:1px solid var(--amber-dim)}
+#list .dot{width:18px;text-align:center;font-size:13px;color:var(--bezel-hi)}
+#list .saved .dot{color:var(--amber)}
+#list .live .dot{color:var(--teal)}
+#list code{font:500 13px "IBM Plex Mono",monospace}
+#list small{color:var(--text-muted);margin-left:auto;font-size:11px;white-space:nowrap}
+.legend{font-size:12px;color:var(--text-muted);margin-top:10px;line-height:1.6}
+.legend b{font-weight:500}
+.tips{grid-column:1/-1;color:var(--text-muted);font-size:13px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>VO Recorder <span>· Weather History and Probability</span></h1>
+    <div id="tally"></div>
+  </header>
+
+  <main class="card">
+    <div class="meta">
+      <span class="kind" id="kind">NARRATION</span>
+      <span class="panel" id="panel"></span>
+      <span class="fname" id="fname"></span>
+    </div>
+    <div id="script"></div>
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div id="playhead"></div>
+      <div id="recbadge" hidden><i></i><span id="clock">0.0</span></div>
+      <div id="count" hidden></div>
+      <div id="hint"></div>
+    </div>
+    <div class="btns" id="btns"></div>
+    <div id="msg"></div>
+    <div class="nav">
+      <button id="prev">◀ Prev</button>
+      <button id="next">Next ▶</button>
+      <span>Space record/stop · P play · R redo · Enter save · ← → line</span>
+    </div>
+  </main>
+
+  <aside class="card">
+    <h2>Lines</h2>
+    <ul id="list"></ul>
+    <div class="legend"><b style="color:var(--amber)">✓</b> saved on this device &nbsp; <b style="color:var(--teal)">●</b> already received</div>
+  </aside>
+
+  <p class="tips">Saved files go to your Downloads folder (on iPhone, pick “Save to Files” or AirDrop). Attach them in the Claude chat and they go straight into the video.</p>
+</div>
+
+<script>
+const LINES = /*LINES*/[{"name": "s1-a", "panel": "1 · Cold open", "text": "Shelter Cove. Thirty-four hundred feet of runway on a bluff above the Pacific. On a good day, it's one of the prettiest arrivals in California.", "kind": "narration", "live": false}, {"name": "s1-b", "panel": "1 · Cold open", "text": "On a bad day, it's this. So before I plan an August trip here, I want to know: what are my chances of actually getting in? And if I can't, where do I go instead?", "kind": "narration", "live": false}, {"name": "s2-a", "panel": "2 · Why this app", "text": "Shelter Cove has a lot going for it: a small village, walk to lunch, and the Lost Coast all around. What it doesn't have is a weather station, or, at least for now, an instrument approach. The FAA has just proposed airspace for a GPS approach, but even a GPS approach has minimums, and a marine layer sitting below them still means you're not getting in.", "kind": "narration", "live": false}, {"name": "s2-b", "panel": "2 · Why this app", "text": "And it sits right in the path of the summer marine layer. A forecast can tell me about tomorrow. What I wanted to know was the pattern: in a typical August, at the hour I'd arrive, how often is it actually flyable? That's why I built this app.", "kind": "narration", "live": false}, {"name": "s3-a", "panel": "3 · Climate, not forecast", "text": "Weather is what you get on the day. Climate is what you can expect. This app is about climate. It pulls years of hourly observations from NOAA and asks a simple question: at this airport, in this month, at this hour, how often were conditions favorable?", "kind": "narration", "live": false}, {"name": "s3-b", "panel": "3 · Climate, not forecast", "text": "Shelter Cove has no weather station, so the app suggests a nearby one with a similar coastal, low-cloud profile. I'm using Arcata–Eureka, 48 nautical miles up the coast. It's not perfect, but it's the same marine layer.", "kind": "narration", "live": false}, {"name": "s3-c", "panel": "3 · Climate, not forecast", "text": "One caveat up front: these are historical odds, not a forecast. You still get a briefing.", "kind": "narration", "live": false}, {"name": "s4-a", "panel": "4 · Six criteria", "text": "The app checks six things, hour by hour: a low cloud layer, below-VFR ceiling or visibility, fog, convective storms, moderate or heavier precipitation, and strong winds. An hour counts as favorable only if all six are good at once.", "kind": "narration", "live": false}, {"name": "s4-b", "panel": "4 · Six criteria", "text": "The bars show how often that happened, month by month. For Shelter Cove's stand-in, August at midday comes in at about 43 percent.", "kind": "narration", "live": false}, {"name": "s4-c", "panel": "4 · Heat map", "text": "The heat map tells you why. Of the hours that weren't flyable, it shows which conditions were to blame. Red is the biggest culprit. Here it's no mystery: low clouds and below-VFR conditions, all summer long. Tap any row and you can chart it by itself.", "kind": "narration", "live": false}, {"name": "s4-d", "panel": "4 · Drill-down", "text": "Hover a bar and you get the ceiling heights behind it. Here's the part that matters to a pilot: in August, when there's a ceiling at all, half the time it's 600 feet or lower. Red Bluff, by contrast, has no ceiling 97 percent of the time.", "kind": "narration", "live": false}, {"name": "s5-a", "panel": "5 · Time of day", "text": "Time of day matters a lot here. Arrive around ten in the morning in August, and the odds are about 32 percent. Push the arrival to mid-afternoon, after the marine layer has had a chance to burn off, and it's about 61 percent.", "kind": "narration", "live": false}, {"name": "s5-b", "panel": "5 · The alternate", "text": "Now the backup. Eureka is the closest field with an approach, but in summer it doesn't do any better. So look inland. Red Bluff, about 84 nautical miles east over the Coast Range: in August at midday it's favorable about 91 percent of the time, against 43 percent for our stand-in.", "kind": "narration", "live": false}, {"name": "s5-c", "panel": "5 · The alternate", "text": "The heat map shows the trade: Red Bluff's red sits in the wind row, not the cloud rows. And the temperature chart says summer afternoons in the valley run hot, so plan for density altitude. A legal alternate isn't the same as one that works in real life. Let the data pick it.", "kind": "narration", "live": false}, {"name": "s6-a", "panel": "6 · Reno winds", "text": "Different airport, different problem. Reno in April: clouds aren't the issue, wind is. The heat map lights up in one row. Arrive mid-morning and about 95 percent of hours have the wind within limits. By mid-afternoon it's about 81 percent, so roughly one hour in five is too windy.", "kind": "narration", "live": false}, {"name": "s6-b", "panel": "6 · Reno winds", "text": "Reno's two long runways run north–south, and the afternoon westerlies blow right across them. I've watched airliners go around in it. For us there's Runway 26: just over six thousand feet, pointed into the wind. So before you go, check the NOTAMs and make sure 26 is open.", "kind": "narration", "live": false}, {"name": "s7-a", "panel": "7 · Wrap-up", "text": "Any airport, any month, any time of day, and a second airport to compare it with. It won't tell you what tomorrow brings. It will tell you what to expect, why, and whether your backup really is one.", "kind": "narration", "live": false}, {"name": "s7-b", "panel": "7 · Wrap-up · in flight", "text": "But this is planning, not the flight. Once you're airborne, keep checking the current METARs and TAFs for your destination and your alternates, on the panel, on the EFB, or by radio. Shelter Cove has no weather station of its own, so watch the stations around it, and keep your alternate's numbers fresh.", "kind": "narration", "live": false}, {"name": "s7-c", "panel": "7 · End card", "text": "You'll find it on GeezerGeek Pilot Apps. The QR code's on screen. Try your own airports.", "kind": "narration", "live": false}]/*END*/;
+const $ = id => document.getElementById(id);
+const SKEY = 'whp.rec.saved';
+let saved = {}; try { saved = JSON.parse(localStorage.getItem(SKEY) || '{}'); } catch (e) {}
+const keep = () => { try { localStorage.setItem(SKEY, JSON.stringify(saved)); } catch (e) {} };
+
+let idx = 0, state = 'idle';           // idle | count | rec | review
+let stream = null, micSrc = null, revBuf = null, revSrc = null, actx = null, analyser = null, rec = null, chunks = [], blob = null, blobUrl = null, peaks = null;
+let timers = [], raf = 0, t0 = 0;
+const player = new Audio();
+const TYPES = [['audio/mp4;codecs=mp4a.40.2', 'm4a'], ['audio/mp4', 'm4a'], ['audio/webm;codecs=opus', 'webm'], ['audio/webm', 'webm'], ['audio/ogg;codecs=opus', 'ogg']];
+const fmt = (typeof MediaRecorder !== 'undefined' && TYPES.find(([t]) => MediaRecorder.isTypeSupported(t))) || ['', 'm4a'];
+const fileName = () => LINES[idx].name + '.' + fmt[1];
+
+// ---------- rendering ----------
+function renderList() {
+  const ul = $('list'); ul.innerHTML = '';
+  LINES.forEach((l, i) => {
+    const li = document.createElement('li');
+    li.className = (i === idx ? 'cur ' : '') + (saved[l.name] ? 'saved' : l.live ? 'live' : '');
+    li.innerHTML = `<span class="dot">${saved[l.name] ? '✓' : l.live ? '●' : '○'}</span><code>${l.name}</code><small>${l.kind === 'bubble' ? 'bubble' : ''}</small>`;
+    li.onclick = () => go(i);
+    ul.appendChild(li);
+    if (i === idx) li.scrollIntoView({ block: 'nearest' });
+  });
+  const n = LINES.filter(l => saved[l.name]).length;
+  $('tally').innerHTML = `<b>${n}</b> of ${LINES.length} saved`;
+}
+function renderLine() {
+  const l = LINES[idx];
+  $('kind').textContent = l.kind === 'bubble' ? 'WAYNE BUBBLE' : 'NARRATION';
+  $('kind').className = 'kind' + (l.kind === 'bubble' ? ' bubble' : '');
+  $('panel').textContent = l.panel;
+  $('fname').textContent = fileName();
+  $('script').textContent = l.text;
+  $('script').className = l.kind === 'bubble' ? 'bubble' : '';
+}
+function setState(s) {
+  state = s;
+  const b = $('btns'); b.innerHTML = '';
+  const add = (label, cls, fn, key) => { const e = document.createElement('button'); e.className = cls || ''; e.innerHTML = label + (key ? `<kbd>${key}</kbd>` : ''); e.onclick = fn; b.appendChild(e); return e; };
+  $('count').hidden = s !== 'count'; $('recbadge').hidden = s !== 'rec';
+  $('hint').hidden = !(s === 'idle'); $('playhead').style.display = s === 'review' ? 'block' : 'none';
+  $('prev').disabled = $('next').disabled = (s === 'count' || s === 'rec');
+  if (s === 'idle') {
+    clearCanvas();
+    $('hint').textContent = saved[LINES[idx].name] ? 'Saved already. Record again to replace.' : 'Press Record. A 3-second countdown, then speak.';
+    add('● Record', 'rec', startCount, 'Space').focus();
+  } else if (s === 'count') add('Cancel', '', cancel, 'Esc');
+  else if (s === 'rec') add('■ Stop', 'rec', stopRec, 'Space').focus();
+  else if (s === 'review') {
+    add('▶ Play', '', play, 'P');
+    add('↺ Redo', '', redo, 'R');
+    add('✓ OK, save ' + fileName(), 'primary ok', save, 'Enter').focus();
+  }
+}
+function go(i) {
+  if (state === 'count' || state === 'rec') return;
+  idx = (i + LINES.length) % LINES.length;
+  discard(); renderLine(); renderList(); setState('idle'); msg('');
+  try { localStorage.setItem('whp.rec.idx', idx); } catch (e) {}
+}
+function msg(t, err) { $('msg').textContent = t; $('msg').className = err ? 'err' : ''; }
+
+// ---------- canvas ----------
+const cv = $('cv'), g = cv.getContext('2d');
+function fit() { const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1; cv.width = r.width * d; cv.height = r.height * d; g.setTransform(d, 0, 0, d, 0, 0); return r; }
+// Meter scale in dB, like a recorder's level meter: -48 dBFS at the center line, 0 dBFS at the top and bottom edges.
+const dbScale = (p) => Math.min(1, Math.max(0, (20 * Math.log10(p + 1e-9) + 48) / 48));
+// Target zone for speech peaks: -24 to -6 dBFS (the green band). Above -1 dBFS turns red.
+function band(r) {
+  const mid = r.height / 2, lo = dbScale(10 ** (-24 / 20)) * mid * 0.95, hi = dbScale(10 ** (-6 / 20)) * mid * 0.95;
+  g.fillStyle = 'rgba(62, 203, 134, 0.10)';
+  g.fillRect(0, mid - hi, r.width, hi - lo); g.fillRect(0, mid + lo, r.width, hi - lo);
+  g.fillStyle = 'rgba(62, 203, 134, 0.55)'; g.font = '11px IBM Plex Mono, monospace'; g.textAlign = 'right';
+  g.fillText('aim here', r.width - 6, mid - hi + 12);
+}
+function clearCanvas() { const r = fit(); g.clearRect(0, 0, r.width, r.height); band(r); }
+function drawLive() {
+  const r = fit(), buf = new Float32Array(analyser.fftSize);
+  const hist = [];
+  const step = () => {
+    analyser.getFloatTimeDomainData(buf);
+    let pk = 0; for (const v of buf) pk = Math.max(pk, Math.abs(v));
+    hist.push(pk); if (hist.length > r.width / 3) hist.shift();
+    g.clearRect(0, 0, r.width, r.height); band(r);
+    const mid = r.height / 2;
+    hist.forEach((p, i) => {
+      const h = Math.max(1, dbScale(p) * mid * 0.95);
+      g.fillStyle = p > 0.89 ? '#e0705f' : '#f5a623';
+      g.fillRect(r.width - (hist.length - i) * 3, mid - h, 2, h * 2);
+    });
+    $('clock').textContent = ((performance.now() - t0) / 1000).toFixed(1) + ' s';
+    raf = requestAnimationFrame(step);
+  };
+  step();
+}
+function drawWave(prog) {
+  const r = fit(); g.clearRect(0, 0, r.width, r.height); band(r);
+  if (!peaks) { g.fillStyle = '#8b93a1'; g.font = '14px IBM Plex Sans'; g.textAlign = 'center'; g.fillText('Recorded. Press Play to review.', r.width / 2, r.height / 2); return; }
+  const mid = r.height / 2, n = peaks.length, w = r.width / n;
+  for (let i = 0; i < n; i++) {
+    const h = Math.max(1, dbScale(peaks[i]) * mid * 0.95);
+    g.fillStyle = (prog != null && i / n <= prog) ? '#f5a623' : '#7a5a1e';
+    g.fillRect(i * w, mid - h, Math.max(1, w - 1), h * 2);
+  }
+}
+
+// ---------- audio ----------
+async function ensureMic() {
+  if (stream) return true;
+  if (!navigator.mediaDevices || typeof MediaRecorder === 'undefined') { msg('This browser can’t record audio. Try Safari or Chrome.', true); return false; }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
+  } catch (e) { msg('Microphone blocked. Allow the mic for this site and try again.', true); return false; }
+  if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); analyser = actx.createAnalyser(); analyser.fftSize = 2048; }
+  micSrc = actx.createMediaStreamSource(stream); micSrc.connect(analyser);
+  return true;
+}
+// iPhone: while a page holds the mic, iOS plays sound through the quiet earpiece. Let go of it after each take.
+function releaseMic() {
+  try { micSrc && micSrc.disconnect(); } catch (e) {}
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; micSrc = null;
+}
+function beep(f, dur = 0.12) {
+  const o = actx.createOscillator(), v = actx.createGain();
+  o.frequency.value = f; o.type = 'sine';
+  v.gain.setValueAtTime(0.0001, actx.currentTime);
+  v.gain.exponentialRampToValueAtTime(0.25, actx.currentTime + 0.01);
+  v.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + dur);
+  o.connect(v).connect(actx.destination); o.start(); o.stop(actx.currentTime + dur + 0.02);
+}
+async function startCount() {
+  if (state !== 'idle' && state !== 'review') return;
+  discard(); msg('');
+  if (!(await ensureMic())) return;
+  if (actx.state === 'suspended') await actx.resume();
+  setState('count');
+  [3, 2, 1].forEach((n, i) => timers.push(setTimeout(() => { $('count').textContent = n; beep(660); }, i * 1000)));
+  timers.push(setTimeout(startRec, 3000));
+}
+function startRec() {
+  chunks = [];
+  try { rec = fmt[0] ? new MediaRecorder(stream, { mimeType: fmt[0], audioBitsPerSecond: 160000 }) : new MediaRecorder(stream); }
+  catch (e) { rec = new MediaRecorder(stream); }
+  rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  rec.onstop = finishRec;
+  rec.start();
+  t0 = performance.now();
+  setState('rec'); drawLive();
+}
+function stopRec() { if (state === 'rec' && rec && rec.state !== 'inactive') { cancelAnimationFrame(raf); rec.stop(); } }
+async function finishRec() {
+  releaseMic();
+  blob = new Blob(chunks, { type: rec.mimeType || fmt[0] || 'audio/mp4' });
+  blobUrl = URL.createObjectURL(blob);
+  player.src = blobUrl;
+  peaks = null; setState('review'); drawWave();
+  const secs = ((performance.now() - t0) / 1000).toFixed(1);
+  msg(`Recorded ${secs} s. Play it back, then save or redo.`);
+  try {
+    const ab = await blob.arrayBuffer();
+    const buf = await new Promise((res, rej) => actx.decodeAudioData(ab, res, rej));
+    revBuf = buf;
+    const d = buf.getChannelData(0), n = 400, size = Math.floor(d.length / n) || 1;
+    peaks = new Float32Array(n);
+    for (let i = 0; i < n; i++) { let m = 0; for (let j = i * size; j < (i + 1) * size && j < d.length; j++) m = Math.max(m, Math.abs(d[j])); peaks[i] = m; }
+    const top = Math.max(...peaks);
+    if (top > 0.98) msg('Recorded, but it clipped (too loud). Back off the mic a little and redo.', true);
+    else if (top < 0.063) msg(`Recorded, but quiet (peaks ${(20 * Math.log10(top)).toFixed(0)} dB, below the green band). Move the phone’s bottom edge closer, about 6 inches, and redo.`, true);
+    else msg(`Recorded ${secs} s, peaks ${(20 * Math.log10(top)).toFixed(0)} dB. Level is good; play it back, then save or redo.`);
+    drawWave();
+  } catch (e) { /* waveform is optional */ }
+}
+function play() {
+  if (!blobUrl) return;
+  if (revBuf) return playLevelled();
+  if (!player.paused) { player.pause(); return; }
+  player.currentTime = 0; player.play().catch(() => msg('Playback was blocked. Tap Play again.', true));
+  const tick = () => {
+    if (player.paused || player.ended) { drawWave(); $('playhead').style.left = '0'; return; }
+    const p = player.duration && isFinite(player.duration) ? player.currentTime / player.duration : null;
+    drawWave(p); if (p != null) $('playhead').style.left = (p * 100) + '%';
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+// Review at the level the take will have in the video: peaks brought up to about -3 dBFS (at most +24 dB).
+function stopReview() { if (revSrc) { try { revSrc.onended = null; revSrc.stop(); } catch (e) {} revSrc = null; } drawWave(); $('playhead').style.left = '0'; }
+async function playLevelled() {
+  if (revSrc) { stopReview(); return; }
+  if (actx.state === 'suspended') await actx.resume();
+  const top = peaks ? Math.max(...peaks) : 0.5;
+  const gain = actx.createGain(); gain.gain.value = Math.min(16, 0.7 / Math.max(top, 1e-3));
+  revSrc = actx.createBufferSource(); revSrc.buffer = revBuf; revSrc.connect(gain).connect(actx.destination);
+  const t = actx.currentTime, dur = revBuf.duration, me = revSrc;
+  revSrc.onended = () => { if (revSrc === me) { revSrc = null; drawWave(); $('playhead').style.left = '0'; } };
+  revSrc.start();
+  const tick = () => { if (revSrc !== me) return; const q = Math.min(1, (actx.currentTime - t) / dur); drawWave(q); $('playhead').style.left = (q * 100) + '%'; requestAnimationFrame(tick); };
+  requestAnimationFrame(tick);
+}
+function redo() { player.pause(); stopReview(); startCount(); }
+function cancel() { timers.forEach(clearTimeout); timers = []; setState('idle'); }
+function discard() { player.pause(); stopReview(); revBuf = null; timers.forEach(clearTimeout); timers = []; if (blobUrl) URL.revokeObjectURL(blobUrl); blob = blobUrl = peaks = null; }
+
+async function save() {
+  if (!blob) return;
+  player.pause(); stopReview();
+  const name = fileName();
+  const file = new File([blob], name, { type: blob.type });
+  const touch = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  let ok = false;
+  if (touch && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: name }); ok = true; }
+    catch (e) { if (e.name === 'AbortError') { msg('Not saved. Tap OK again when ready.'); return; } }
+  }
+  if (!ok) {
+    const a = document.createElement('a'); a.href = blobUrl; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); ok = true;
+  }
+  saved[LINES[idx].name] = Date.now(); keep();
+  const nextI = LINES.findIndex((l, i) => i > idx && !saved[l.name]);
+  const done = LINES[idx].name;
+  setTimeout(() => {
+    if (nextI >= 0) { go(nextI); msg(`Saved ${name}. Next up: ${LINES[nextI].name}.`); }
+    else { renderList(); setState('idle'); msg(`Saved ${name}. That’s every line after ${done}.`); }
+  }, 600);
+}
+
+// ---------- keys ----------
+document.addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key;
+  if ((k === ' ' || k === 'Enter') && document.activeElement && document.activeElement.tagName === 'BUTTON') document.activeElement.blur();
+  if (k === ' ') { e.preventDefault(); if (state === 'rec') stopRec(); else if (state === 'idle' || state === 'review') startCount(); }
+  else if (k === 'Escape' && state === 'count') cancel();
+  else if ((k === 'p' || k === 'P') && state === 'review') play();
+  else if ((k === 'r' || k === 'R') && state === 'review') redo();
+  else if (k === 'Enter' && state === 'review') { e.preventDefault(); save(); }
+  else if (k === 'ArrowRight' && state !== 'rec' && state !== 'count') go(idx + 1);
+  else if (k === 'ArrowLeft' && state !== 'rec' && state !== 'count') go(idx - 1);
+});
+$('prev').onclick = () => go(idx - 1);
+$('next').onclick = () => go(idx + 1);
+addEventListener('resize', () => { if (state === 'review') drawWave(); });
+
+// ---------- start ----------
+const hashName = decodeURIComponent(location.hash.slice(1));
+let start = LINES.findIndex(l => l.name === hashName);
+if (start < 0) { try { start = +localStorage.getItem('whp.rec.idx') || 0; } catch (e) { start = 0; } }
+if (start < 0 || start >= LINES.length) start = 0;
+go(start);
+</script>
+</body>
+</html>
