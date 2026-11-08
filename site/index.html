@@ -723,7 +723,7 @@
   html.modal-open, html.modal-open body{ overflow:hidden; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<!-- GGP-FOOTER-CSS START v1.5 · 07-Nov-2026 · shared footer styles, App Conventions §5b · master: Control Panel repo tools/ggp-footer -->
+<!-- GGP-FOOTER-CSS START v1.6 · 07-Nov-2026 · shared footer styles, App Conventions §5b · master: Control Panel repo tools/ggp-footer -->
 <style>
 .ggp-footer{
   --ggp-amber:#f5a623; --ggp-muted:#8b93a1; --ggp-bezel:#2a323f; --ggp-bezel-hi:#3a4454;
@@ -756,6 +756,12 @@
   font:inherit; font-size:12.5px; line-height:1.2; cursor:pointer; transition:color .15s ease, border-color .15s ease;
 }
 .ggp-footer a.ggp-pill{ text-decoration:none; }
+/* v1.6: shown under a feedback button when no email app opened */
+.ggp-fb-note{ flex-basis:100%; margin:10px auto 0; max-width:460px; padding:10px 12px; border:1px solid #3a4454; border-radius:6px;
+  font:12px/1.5 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; color:#8b93a1; text-align:center; }
+.ggp-fb-note b{ color:#e7e4dc; font-weight:500; user-select:all; }
+.ggp-fb-note button{ margin-left:8px; padding:3px 10px; border:1px solid #3a4454; border-radius:12px; background:transparent;
+  color:#f5a623; font:inherit; cursor:pointer; }
 .ggp-footer .ggp-pill:hover{ color:var(--ggp-amber); border-color:var(--ggp-amber); background:transparent; }
 .ggp-footer .ggp-pill svg{ width:15px; height:15px; flex-shrink:0; }
 .ggp-footer .ggp-pill span{ text-wrap:balance; }
@@ -980,13 +986,13 @@
 
   <div class="disclaimer"><span class="disclaimer-label">Disclaimer:</span> <span class="disclaimer-quote">&ldquo;There are three kinds of lies: lies, damned lies, and statistics.&rdquo;</span> &mdash; Mark Twain</div>
 
-  <!-- GGP-FOOTER START v1.5 · 07-Nov-2026 · shared footer, App Conventions §5a · master: Control Panel repo tools/ggp-footer -->
+  <!-- GGP-FOOTER START v1.6 · 07-Nov-2026 · shared footer, App Conventions §5a · master: Control Panel repo tools/ggp-footer -->
 <footer class="ggp-footer">
   <div class="ggp-back"><a href="https://geezer-geek-pilot-control-panel.netlify.app/">&larr; Back to GeezerGeek Pilot Apps</a></div>
   <div class="ggp-credit">Wayne McClelland (<a href="https://geezer-geek-pilot-control-panel.netlify.app/airports/" target="_blank" rel="noopener">airports visited</a>), <a href="https://youtube.com/@GeezerGeekPilot" target="_blank" rel="noopener">GeezerGeek Pilot</a>, <a href="https://docs.google.com/document/d/1chfDa3JBCjsGykGjwrAFwOqMAS7d3_dIY9ieROLCIyU/preview" target="_blank" rel="noopener">Reference Materials</a></div>
   <div class="ggp-actions">
     <button class="ggp-pill ggp-share" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg><span>Share GeezerGeek Pilot Apps with pilot friends</span></button>
-    <a class="ggp-pill ggp-feedback" href="https://geezer-geek-pilot-control-panel.netlify.app/feedback/?app=weather-history-probability"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Send feedback</span></a>
+    <button class="ggp-pill ggp-feedback" type="button" data-app="Weather History and Probability"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Send feedback</span></button>
   </div>
 </footer>
 <!-- GGP-FOOTER END -->
@@ -2947,7 +2953,7 @@
     .catch(() => { /* fail silently if the counter function is unavailable */ });
 </script>
 
-<!-- GGP-FOOTER-JS START v1.5 · 07-Nov-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
+<!-- GGP-FOOTER-JS START v1.6 · 07-Nov-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
 <script>
 (() => {
   if (window.__ggpFooter) return;
@@ -2981,6 +2987,40 @@
       window.location.href = 'mailto:?subject=' + encodeURIComponent(SHARE_TITLE)
         + '&body=' + encodeURIComponent(SHARE_TEXT + ' ' + SHARE_URL);
     }
+  });
+  // v1.6 feedback: any element with class ggp-feedback opens an email to Wayne naming its data-app.
+  // If no email app takes over within ~1.5 s (page still focused), show the address with a Copy button.
+  document.addEventListener('click', (ev) => {
+    const btn = ev.target instanceof Element ? ev.target.closest('.ggp-feedback') : null;
+    if (!btn) return;
+    ev.preventDefault();
+    const addr = ['waynemcc', 'wamware.com'].join('@');
+    const app = btn.dataset.app || document.title;
+    const subject = 'GeezerGeek feedback: ' + app;
+    const body = 'App: ' + app + '\nPage: ' + location.href + '\n\nWhat happened, or what would you like to see?\n\n\n'
+      + '—\nDevice: ' + (navigator.userAgent || '').slice(0, 200);
+    let left = false;
+    const onLeave = () => { left = true; };
+    window.addEventListener('blur', onLeave, { once: true });
+    document.addEventListener('visibilitychange', onLeave, { once: true });
+    window.location.href = 'mailto:' + addr + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    setTimeout(() => {
+      window.removeEventListener('blur', onLeave);
+      document.removeEventListener('visibilitychange', onLeave);
+      if (left || !document.hasFocus()) return;           // an email app opened
+      const host = btn.parentElement;
+      if (host.querySelector('.ggp-fb-note')) return;
+      const note = document.createElement('div');
+      note.className = 'ggp-fb-note';
+      note.setAttribute('role', 'status');
+      note.innerHTML = 'No email app opened? Write to <b></b><button type="button">Copy address</button>';
+      note.querySelector('b').textContent = addr;
+      note.querySelector('button').addEventListener('click', async (e) => {
+        try { await navigator.clipboard.writeText(addr); e.target.textContent = 'Copied'; }
+        catch (err) { e.target.textContent = 'Select it above'; }
+      });
+      host.appendChild(note);
+    }, 1500);
   });
   // Open counter: shown only where the footer has #ggpCount (the Control Panel). Apps count silently.
   const countEl = document.getElementById('ggpCount');
