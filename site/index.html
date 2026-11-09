@@ -2940,18 +2940,17 @@
   })();
 
 
-  // ---- open counter (our own Netlify Blobs-backed function) ----
-  fetch('/.netlify/functions/hit-counter')
+  // ---- open counter (App-Conventions §6b; Tally from 09-Nov-2026, fails silently) ----
+  // Opens counted by the old hit-counter function before the switch are carried as a fixed base on the
+  // Control Panel's stats page. The function stays deployed (read-only use, ?mode=read) but the page no longer calls it.
+  fetch('https://tally.yuki.sh/hits/wamware/weather-history-probability.json')
     .then(r => r.json())
-    .then(data => {
-      const hitCounterEl = document.getElementById('hitCounter');
-      if (hitCounterEl && data && typeof data.count === 'number') {
-        hitCounterEl.textContent = `Opened ${data.count} times`;
-      }
-      if (data && data.error) console.warn('hit-counter error:', data.error);
-      if (data && data.note) console.warn('hit-counter note:', data.note);
+    .then(d => {
+      const el = document.getElementById('hitCounter');
+      const n = d && d.visit;
+      if (el && typeof n === 'number') el.textContent = 'Opened ' + n.toLocaleString() + (n === 1 ? ' time' : ' times');
     })
-    .catch(() => { /* fail silently if the counter function is unavailable */ });
+    .catch(() => { /* counter is a nice-to-have, never block the app */ });
 </script>
 
 <!-- GGP-FOOTER-JS START v1.11 · 09-Nov-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
