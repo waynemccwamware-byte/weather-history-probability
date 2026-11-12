@@ -723,7 +723,7 @@
   html.modal-open, html.modal-open body{ overflow:hidden; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<!-- GGP-FOOTER-CSS START v1.12 · 10-Nov-2026 · shared footer styles, App Conventions §5b · master: Control Panel repo tools/ggp-footer -->
+<!-- GGP-FOOTER-CSS START v1.13 · 12-Nov-2026 · shared footer styles, App Conventions §5b · master: Control Panel repo tools/ggp-footer -->
 <style>
 .ggp-footer{
   --ggp-amber:#f5a623; --ggp-muted:#8b93a1; --ggp-bezel:#2a323f; --ggp-bezel-hi:#3a4454;
@@ -986,7 +986,7 @@
 
   <div class="disclaimer"><span class="disclaimer-label">Disclaimer:</span> <span class="disclaimer-quote">&ldquo;There are three kinds of lies: lies, damned lies, and statistics.&rdquo;</span> &mdash; Mark Twain</div>
 
-  <!-- GGP-FOOTER START v1.12 · 10-Nov-2026 · shared footer, App Conventions §5a · master: Control Panel repo tools/ggp-footer -->
+  <!-- GGP-FOOTER START v1.13 · 12-Nov-2026 · shared footer, App Conventions §5a · master: Control Panel repo tools/ggp-footer -->
 <footer class="ggp-footer">
   <div class="ggp-back"><a href="https://geezer-geek-pilot-control-panel.netlify.app/">&larr; Back to GeezerGeek Pilot Apps</a></div>
   <div class="ggp-credit">Wayne McClelland (<a href="https://geezer-geek-pilot-control-panel.netlify.app/airports/" target="_blank" rel="noopener">airports visited</a>), <a href="https://youtube.com/@GeezerGeekPilot" target="_blank" rel="noopener">GeezerGeek Pilot</a>, <a href="https://docs.google.com/document/d/1chfDa3JBCjsGykGjwrAFwOqMAS7d3_dIY9ieROLCIyU/preview" target="_blank" rel="noopener">Reference Materials</a></div>
@@ -2943,7 +2943,7 @@
   // ---- open counter (App-Conventions §6b; Tally from 09-Nov-2026, fails silently) ----
   // Opens counted by the old hit-counter function before the switch are carried as a fixed base on the
   // Control Panel's stats page. The function stays deployed (read-only use, ?mode=read) but the page no longer calls it.
-  fetch('https://tally.yuki.sh/hits/wamware/weather-history-probability.json')
+  fetch('https://tally.yuki.sh/counters/wamware/weather-history-probability', { method: 'POST' })  /* Tally API moved ~11-Nov-2026: POST counts and returns counts */
     .then(r => r.json())
     .then(d => {
       const el = document.getElementById('hitCounter');
@@ -2953,7 +2953,7 @@
     .catch(() => { /* counter is a nice-to-have, never block the app */ });
 </script>
 
-<!-- GGP-FOOTER-JS START v1.12 · 10-Nov-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
+<!-- GGP-FOOTER-JS START v1.13 · 12-Nov-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
 <script>
 (() => {
   if (window.__ggpFooter) return;
@@ -3025,12 +3025,14 @@
   // (the Open Counts page shows it as "unique since 10-Nov-2026"). Pages that are not apps carry
   // data-ggp-all="off" on their footer. The Quiz draws its footer later, so a missing footer still counts.
   if (!document.querySelector('.ggp-footer[data-ggp-all="off"]')) {
-    fetch('https://tally.yuki.sh/hits/wamware/ggp-all.json').catch(() => { /* never block the app */ });
+    fetch('https://tally.yuki.sh/counters/wamware/ggp-all', { method: 'POST' }).catch(() => { /* never block the app */ });
   }
   // Open counter: shown only where the footer has #ggpCount (the Control Panel). Apps count silently.
   const countEl = document.getElementById('ggpCount');
   if (countEl) {
-    fetch('https://tally.yuki.sh/hits/wamware/geezer-geek-pilot-control-panel.json')
+    // v1.13: Tally (now "Tallyflare") moved to /counters/<ns>/<key>: POST records a visit and returns the
+    // counts, GET only reads. The old hits URLs return 404 since ~11-Nov-2026; counts carried over.
+    fetch('https://tally.yuki.sh/counters/wamware/geezer-geek-pilot-control-panel', { method: 'POST' })
       .then(r => r.json())
       .then(d => {
         const base = parseInt(countEl.dataset.base, 10) || 0;  // pre-Tally opens, App Conventions §6b
