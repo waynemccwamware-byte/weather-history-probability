@@ -723,7 +723,100 @@
   html.modal-open, html.modal-open body{ overflow:hidden; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<!-- GGP-FOOTER-CSS START v1.14 · 13-Nov-2026 · shared footer styles, App Conventions §5b · master: Control Panel repo tools/ggp-footer -->
+<!-- GGP-FOOTER-CSS START v1.15 · 25-Nov-2026 · shared footer styles + language core, App Conventions §5b · master: Control Panel repo tools/ggp-footer -->
+<script>
+(function () {
+  if (window.ggpLang) return;
+  var KEY = 'ggp-lang', I18N = false, SITES = ['geezer-geek-pilot-control-panel','weather-history-probability','digital-autopilots-quiz','tec-route-lookup','atc-chair-fly-trainer','days-flight-schedule','fuel-to-add','clearance-delivery','piston-ga-stats','claude-foreflight-primer','airfield-kml-builder','emergency-airstrips-mexico'];
+  var q = null, saved = null, lang, explicit = false;
+  try { q = new URLSearchParams(location.search).get('lang'); } catch (e) {}
+  try { saved = localStorage.getItem(KEY); } catch (e) {}
+  if (q === 'en' || q === 'es') { lang = q; explicit = true; if (saved !== q) { try { localStorage.setItem(KEY, q); } catch (e) {} } }
+  else if (saved === 'en' || saved === 'es') { lang = saved; explicit = true; }
+  else {
+    var ua = navigator.userAgent || '';
+    var mobile = /iPhone|iPad|iPod|Android/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    var first = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+    lang = mobile && /^es\b/i.test(first) ? 'es' : 'en';
+  }
+  var es = lang === 'es';
+  if (I18N) document.documentElement.lang = es ? 'es-MX' : 'en';
+  var MON = { en: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+              es: ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'] };
+  var ATTRS = ['title', 'placeholder', 'aria-label', 'alt', 'value', 'content'];
+  var ours = function (host) { return SITES.indexOf(host.replace(/\.netlify\.app$/, '').replace(/^[a-z0-9-]+--/, '')) >= 0 && /\.netlify\.app$/.test(host); };
+  var withLang = function (href) {
+    try {
+      var u = new URL(href, location.href);
+      if (!/^https?:$/.test(u.protocol) || !ours(u.hostname)) return href;
+      u.searchParams.set('lang', lang);
+      return u.toString();
+    } catch (e) { return href; }
+  };
+  var G = window.ggpLang = {
+    lang: lang, es: es, explicit: explicit, i18n: I18N,
+    // L('English', 'Español'): the string for the current language (Spanish missing → English)
+    L: function (en, sp) { return es && sp != null ? sp : en; },
+    // dd-mmm-yyyy: 25-Nov-2026 / 25-nov-2026. Takes a Date or 'YYYY-MM-DD…'.
+    date: function (d) {
+      var y, m, dd;
+      if (d instanceof Date) { y = d.getFullYear(); m = d.getMonth(); dd = d.getDate(); }
+      else { var x = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); if (!x) return String(d || ''); y = +x[1]; m = +x[2] - 1; dd = +x[3]; }
+      return (dd < 10 ? '0' : '') + dd + '-' + MON[lang][m] + '-' + y;
+    },
+    withLang: withLang,
+    // Elements marked data-es="…" (innerHTML) or data-es-title, data-es-placeholder, … get their Spanish once.
+    apply: function (root) {
+      if (!es) return;
+      root = root || document;
+      var els = root.querySelectorAll('[data-es],' + ATTRS.map(function (a) { return '[data-es-' + a + ']'; }).join(','));
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (el.__ggpEs) continue;
+        el.__ggpEs = true;
+        if (el.hasAttribute('data-es') && (I18N || el.closest('.ggp-footer'))) el.innerHTML = el.getAttribute('data-es');
+        for (var j = 0; j < ATTRS.length; j++) {
+          var v = el.getAttribute('data-es-' + ATTRS[j]);
+          if (v != null && (I18N || el.closest('.ggp-footer'))) el.setAttribute(ATTRS[j], v);
+        }
+      }
+    },
+    // Save the choice and reload in it (the page is drawn once per language).
+    set: function (l) {
+      if (l !== 'en' && l !== 'es') return;
+      try { localStorage.setItem(KEY, l); } catch (e) {}
+      if (l === 'es' && !es) { try { fetch('https://tally.yuki.sh/counters/wamware/ggp-es-picked', { method: 'POST', keepalive: true }); } catch (e) {} }
+      if (l === lang && explicit) return;
+      var u = new URL(location.href); u.searchParams.delete('lang');
+      location.replace(u.toString());
+    }
+  };
+  // English | Español switch: any .ggp-lang-switch holding buttons with data-ggp-lang="en" / "es".
+  var mark = function () {
+    var bs = document.querySelectorAll('.ggp-lang-switch [data-ggp-lang]');
+    for (var i = 0; i < bs.length; i++) {
+      var on = bs[i].getAttribute('data-ggp-lang') === lang;
+      bs[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+      bs[i].classList.toggle('on', on);
+    }
+  };
+  document.addEventListener('click', function (ev) {
+    var t = ev.target instanceof Element ? ev.target : null;
+    var b = t && t.closest('.ggp-lang-switch [data-ggp-lang]');
+    if (b) { ev.preventDefault(); G.set(b.getAttribute('data-ggp-lang')); return; }
+    // carry the choice to the suite's other sites (each keeps its own storage)
+    var a = explicit && t && t.closest('a[href]');
+    if (a) { var h = withLang(a.href); if (h !== a.href) a.href = h; }
+  }, true);
+  var links = function () {
+    if (!explicit) return;
+    var as = document.querySelectorAll('a[href]');
+    for (var i = 0; i < as.length; i++) { var h = withLang(as[i].href); if (h !== as[i].href) as[i].href = h; }
+  };
+  document.addEventListener('DOMContentLoaded', function () { G.apply(); mark(); links(); });
+  G.mark = mark;
+})();
+</script>
 <style>
 .ggp-footer{
   --ggp-amber:#f5a623; --ggp-muted:#8b93a1; --ggp-bezel:#2a323f; --ggp-bezel-hi:#3a4454;
@@ -771,6 +864,16 @@
   .ggp-footer .ggp-back, .ggp-footer .ggp-extra, .ggp-footer .ggp-count, .ggp-footer .ggp-actions{ display:none !important; }
   .ggp-footer{ border-top:0; margin-top:8px; padding-top:0; }
 }
+/* v1.15: English | Español switch (App Conventions "Language"); sits at the right end of the title row */
+.ggp-lang-switch{ display:inline-flex; flex-shrink:0; border:1px solid #f5a623; border-radius:16px; overflow:hidden;
+  font:600 12.5px/1 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+.ggp-lang-switch button{ margin:0; padding:7px 12px; border:0; background:transparent; color:#f5a623; font:inherit; cursor:pointer; }
+.ggp-lang-switch button + button{ border-left:1px solid #f5a623; }
+.ggp-lang-switch button.on, .ggp-lang-switch button[aria-pressed="true"]{ background:#f5a623; color:#10141a; }
+.ggp-lang-switch button:not(.on):hover{ background:rgba(245,166,35,.15); }
+.ggp-lang-switch button:focus-visible{ outline:2px solid #e7e4dc; outline-offset:-3px; }
+@media (max-width:400px){ .ggp-lang-switch button{ padding:7px 9px; font-size:12px; } }
+@media print{ .ggp-lang-switch{ display:none !important; } }
 </style>
 <!-- GGP-FOOTER-CSS END -->
 </head>
@@ -986,14 +1089,14 @@
 
   <div class="disclaimer"><span class="disclaimer-label">Disclaimer:</span> <span class="disclaimer-quote">&ldquo;There are three kinds of lies: lies, damned lies, and statistics.&rdquo;</span> &mdash; Mark Twain</div>
 
-  <!-- GGP-FOOTER START v1.14 · 13-Nov-2026 · shared footer, App Conventions §5a · master: Control Panel repo tools/ggp-footer -->
+  <!-- GGP-FOOTER START v1.15 · 25-Nov-2026 · shared footer, App Conventions §5a · master: Control Panel repo tools/ggp-footer -->
 <footer class="ggp-footer">
-  <div class="ggp-back"><a href="https://geezer-geek-pilot-control-panel.netlify.app/">&larr; Back to GeezerGeek Pilot Apps</a></div>
-  <div class="ggp-credit">Wayne McClelland (<a href="https://geezer-geek-pilot-control-panel.netlify.app/airports/" target="_blank" rel="noopener">airports visited</a>), <a href="https://youtube.com/@GeezerGeekPilot" target="_blank" rel="noopener">GeezerGeek Pilot</a>, <a href="https://geezer-geek-pilot-control-panel.netlify.app/reference" target="_blank" rel="noopener">Reference Materials</a></div>
+  <div class="ggp-back"><a href="https://geezer-geek-pilot-control-panel.netlify.app/" data-es="&larr; Volver a las apps de GeezerGeek Pilot">&larr; Back to GeezerGeek Pilot Apps</a></div>
+  <div class="ggp-credit">Wayne McClelland (<a href="https://geezer-geek-pilot-control-panel.netlify.app/airports/" target="_blank" rel="noopener" data-es="aeropuertos visitados">airports visited</a>), <a href="https://youtube.com/@GeezerGeekPilot" target="_blank" rel="noopener">GeezerGeek Pilot</a>, <a href="https://geezer-geek-pilot-control-panel.netlify.app/reference" target="_blank" rel="noopener" data-es="Material de referencia">Reference Materials</a></div>
   <div class="ggp-actions">
-    <button class="ggp-pill ggp-share" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg><span>Share GeezerGeek Pilot Apps with pilot friends</span></button>
-    <button class="ggp-pill ggp-feedback" type="button" data-app="Weather History and Probability"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>Feedback to GeezerGeek Pilot</span></button>
-    <a class="ggp-pill ggp-videos" href="https://www.youtube.com/playlist?list=PLZEU99ONr5bE" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="4"/><polygon points="10 9 15 12 10 15" fill="currentColor"/></svg><span>YouTube intros to the apps</span></a>
+    <button class="ggp-pill ggp-share" type="button"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg><span data-es="Comparte las apps de GeezerGeek Pilot con amigos pilotos">Share GeezerGeek Pilot Apps with pilot friends</span></button>
+    <button class="ggp-pill ggp-feedback" type="button" data-app="Weather History and Probability"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span data-es="Comentarios a GeezerGeek Pilot">Feedback to GeezerGeek Pilot</span></button>
+    <a class="ggp-pill ggp-videos" href="https://www.youtube.com/playlist?list=PLZEU99ONr5bE" target="_blank" rel="noopener"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="4"/><polygon points="10 9 15 12 10 15" fill="currentColor"/></svg><span data-es="Videos de introducción en YouTube (en inglés)">YouTube intros to the apps</span></a>
   </div>
 </footer>
 <!-- GGP-FOOTER END -->
@@ -2953,21 +3056,24 @@
     .catch(() => { /* counter is a nice-to-have, never block the app */ });
 </script>
 
-<!-- GGP-FOOTER-JS START v1.14 · 13-Nov-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
+<!-- GGP-FOOTER-JS START v1.15 · 25-Nov-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
 <script>
 (() => {
   if (window.__ggpFooter) return;
   window.__ggpFooter = true;
   // Every app's footer share button shares the Control Panel, not the app itself.
-  const SHARE_URL   = 'https://geezer-geek-pilot-control-panel.netlify.app/';
-  const SHARE_TITLE = 'GeezerGeek Pilot Apps';
-  const SHARE_TEXT  = 'Planning, weather, ATC-practice and safety tools for GA pilots, from GeezerGeek Pilot.';
+  // v1.15: shared from a Spanish page, the link carries ?lang=es (Spanish preview card, Control Panel opens in Spanish)
+  const SHARE_URL   = 'https://geezer-geek-pilot-control-panel.netlify.app/' + (window.ggpLang && window.ggpLang.es ? '?lang=es' : '');
+  const SHARE_TITLE = window.ggpLang && window.ggpLang.es ? 'Apps de GeezerGeek Pilot' : 'GeezerGeek Pilot Apps';
+  const L = (en, es) => (window.ggpLang ? window.ggpLang.L(en, es) : en);
+  const SHARE_TEXT  = L('Planning, weather, ATC-practice and safety tools for GA pilots, from GeezerGeek Pilot.', 'Herramientas de planeación, meteorología, práctica de ATC y seguridad para pilotos de aviación general, de GeezerGeek Pilot.');
+  if (window.ggpLang) window.ggpLang.apply(document.querySelector('.ggp-footer') || document);
   const flash = (btn) => {
     if (btn.dataset.ggpBusy) return;
     btn.dataset.ggpBusy = '1';
     const label = btn.querySelector('span') || btn;
     const original = label.textContent;
-    label.textContent = label === btn ? 'Link copied!' : 'Link copied to clipboard!';
+    label.textContent = label === btn ? L('Link copied!', '¡Enlace copiado!') : L('Link copied to clipboard!', '¡Enlace copiado al portapapeles!');
     setTimeout(() => { label.textContent = original; delete btn.dataset.ggpBusy; }, 2200);
   };
   // One listener on the document, so it also covers footers an app draws later and any other
@@ -3012,11 +3118,11 @@
       const note = document.createElement('div');
       note.className = 'ggp-fb-note';
       note.setAttribute('role', 'status');
-      note.innerHTML = 'No email app opened? Write to <b></b><button type="button">Copy address</button>';
+      note.innerHTML = L('No email app opened? Write to ', '¿No se abrió tu app de correo? Escribe a ') + '<b></b><button type="button">' + L('Copy address', 'Copiar dirección') + '</button>';
       note.querySelector('b').textContent = addr;
       note.querySelector('button').addEventListener('click', async (e) => {
-        try { await navigator.clipboard.writeText(addr); e.target.textContent = 'Copied'; }
-        catch (err) { e.target.textContent = 'Select it above'; }
+        try { await navigator.clipboard.writeText(addr); e.target.textContent = L('Copied', 'Copiada'); }
+        catch (err) { e.target.textContent = L('Select it above', 'Selecciónala arriba'); }
       });
       host.appendChild(note);
     }, 1500);
@@ -3026,6 +3132,9 @@
   // data-ggp-all="off" on their footer. The Quiz draws its footer later, so a missing footer still counts.
   if (!document.querySelector('.ggp-footer[data-ggp-all="off"]')) {
     fetch('https://tally.yuki.sh/counters/wamware/ggp-all', { method: 'POST' }).catch(() => { /* never block the app */ });
+    // v1.15: and, when the page opens in Spanish, wamware/ggp-es (opens in Spanish; its visitor = Spanish users)
+    if (window.ggpLang && window.ggpLang.es)
+      fetch('https://tally.yuki.sh/counters/wamware/ggp-es', { method: 'POST' }).catch(() => {});
   }
   // Open counter: shown only where the footer has #ggpCount (the Control Panel). Apps count silently.
   const countEl = document.getElementById('ggpCount');
@@ -3038,11 +3147,11 @@
         const base = parseInt(countEl.dataset.base, 10) || 0;  // pre-Tally opens, App Conventions §6b
         const n = d && typeof d.visit === 'number' ? d.visit + base : null;
         if (typeof n !== 'number') return;
-        const text = 'Opened ' + n.toLocaleString() + (n === 1 ? ' time' : ' times');
+        const text = L('Opened ', 'Abierta ') + n.toLocaleString('en-US') + (n === 1 ? L(' time', ' vez') : L(' times', ' veces'));
         const href = countEl.dataset.href;   // v1.4: the count links to the open-counts page
         if (href) {
           const a = document.createElement('a');
-          a.href = href; a.textContent = text; a.title = 'Open counts for every app';
+          a.href = href; a.textContent = text; a.title = L('Open counts for every app', 'Aperturas de cada app');
           countEl.replaceChildren(a);
         } else countEl.textContent = text;
       })
