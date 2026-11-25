@@ -46,7 +46,7 @@
     background:radial-gradient(ellipse at 50% 0%, #171d26 0%, var(--bg-deep) 60%);
     font-family:'IBM Plex Sans', sans-serif;
     color:var(--text-primary);
-    padding:40px 24px;
+    padding:12px 24px 40px;   /* v0.22: was 40px on top (Wayne: less air above the title, all apps) */
     -webkit-text-size-adjust:100%;
     overscroll-behavior:none;
   }
@@ -331,6 +331,15 @@
     box-shadow:0 0 0 3px var(--amber-glow);
   }
   .date-arrow{ color:var(--text-muted); font-size:15px; margin-top:16px; }
+  /* v0.22 (25-Nov-2026): dates shown dd-Mmm-yyyy (Wayne: every app) — the label sits over a transparent native picker,
+     as in Day's Flight Schedule V6, so the browser's own mm/dd/yyyy never shows */
+  .datefld{ position:relative; }
+  .datefld .dtxt{ display:block; padding:9px 11px; font:16px 'IBM Plex Mono', monospace; border:1px solid var(--bezel-hi); border-radius:6px;
+    background:var(--bg-deep); color:var(--text-primary); pointer-events:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .datefld:focus-within .dtxt{ border-color:var(--amber); box-shadow:0 0 0 3px var(--amber-glow); }
+  .date-field .datefld input[type="date"]{ position:absolute; inset:0; width:100%; height:100%; opacity:0; padding:0; border:0; margin:0; cursor:pointer; }
+  .datefld input::-webkit-calendar-picker-indicator{ position:absolute; inset:0; width:auto; height:auto; margin:0; padding:0; cursor:pointer; }
+  .step-airport .datefld .dtxt{ padding-top:5px; padding-bottom:5px; }
   .date-range-note{ font-size:11px; color:var(--text-muted); margin-top:10px; }
 
   /* Run button */
@@ -764,6 +773,12 @@
       else { var x = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); if (!x) return String(d || ''); y = +x[1]; m = +x[2] - 1; dd = +x[3]; }
       return (dd < 10 ? '0' : '') + dd + '-' + MON[lang][m] + '-' + y;
     },
+    // any 25-Nov-2026 in a string, in the current language (25-nov-2026)
+    dmy: function (str) {
+      if (!es) return String(str == null ? '' : str);
+      return String(str == null ? '' : str).replace(/\b(\d{1,2})-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-(\d{4})\b/g,
+        function (m, d, mo, y) { return d + '-' + MON.es[MON.en.indexOf(mo)] + '-' + y; });
+    },
     withLang: withLang,
     // Elements marked data-es="…" (innerHTML) or data-es-title, data-es-placeholder, … get their Spanish once.
     apply: function (root) {
@@ -882,7 +897,7 @@
 <div class="rig">
   <div class="title-row">
     <h1>Weather History and Probability</h1>
-    <span class="ver mono">v0.21</span>
+    <span class="ver mono">v0.22</span>
   </div>
 
   <div class="purpose-line"><span class="purpose-label">Purpose of this app:</span>&nbsp; pull historical NOAA weather for any US, Mexican or Canadian airport and estimate the odds of favorable flying conditions — low cloud layer, VFR, fog, or convection — for a chosen date range and time window</div>
@@ -943,12 +958,12 @@
           <div class="date-range-fields">
             <div class="date-field">
               <label class="small">START</label>
-              <input type="date" id="startDate" value="2021-01-01">
+              <div class="datefld"><span class="dtxt" id="startDateTxt"></span><input type="date" id="startDate" value="2021-01-01" aria-label="Start date"></div>
             </div>
             <div class="date-arrow">→</div>
             <div class="date-field">
               <label class="small">END</label>
-              <input type="date" id="endDate" value="2025-12-31">
+              <div class="datefld"><span class="dtxt" id="endDateTxt"></span><input type="date" id="endDate" value="2025-12-31" aria-label="End date"></div>
             </div>
           </div>
           <div class="date-range-note">Years outside a station's period of record are dropped automatically.</div>
@@ -3012,6 +3027,7 @@
     const isDate = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
     if (isDate(q.get('from'))) document.getElementById('startDate').value = q.get('from');
     if (isDate(q.get('to'))) document.getElementById('endDate').value = q.get('to');
+    if (window.wxDateTxt) window.wxDateTxt();
     const hm = /^(\d{1,2})-(\d{1,2})$/.exec(q.get('h') || '');
     if (hm && +hm[1] <= 23 && +hm[2] <= 23) {
       startSel.value = String(+hm[1]).padStart(2, '0') + ':00';
@@ -3056,6 +3072,20 @@
     .catch(() => { /* counter is a nice-to-have, never block the app */ });
 </script>
 
+<script>
+/* v0.22: dd-Mmm-yyyy labels over the native date pickers */
+(() => {
+  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const f = v => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? `${m[3]}-${M[+m[2] - 1]}-${m[1]}` : '—'; };
+  const ids = ['startDate', 'endDate'];
+  window.wxDateTxt = () => ids.forEach(id => { const i = document.getElementById(id), t = document.getElementById(id + 'Txt'); if (i && t) t.textContent = f(i.value); });
+  ids.forEach(id => { const i = document.getElementById(id); if (!i) return;
+    ['input', 'change', 'blur'].forEach(ev => i.addEventListener(ev, window.wxDateTxt));
+    i.addEventListener('click', () => { try { i.showPicker(); } catch (e) {} });   // desktop: open the calendar on any click
+  });
+  window.wxDateTxt();
+})();
+</script>
 <!-- GGP-FOOTER-JS START v1.15 · 25-Nov-2026 · shared footer script, App Conventions §6a/§6b · master: Control Panel repo tools/ggp-footer -->
 <script>
 (() => {
